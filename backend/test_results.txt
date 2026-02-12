@@ -1,0 +1,175 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\windows-11\Desktop\career-compass-ai-main\backend
+plugins: anyio-3.7.1, langsmith-0.4.41, flask-1.3.0
+collected 21 items
+
+test_ai_depth.py FFF.                                                    [ 19%]
+test_critical_endpoints.py .F                                            [ 28%]
+test_migration.py .........                                              [ 71%]
+test_security.py ...FF                                                   [ 95%]
+test_update_single.py .                                                  [100%]
+
+================================== FAILURES ===================================
+_________________________ test_skill_dependency_graph _________________________
+test_ai_depth.py:53: in test_skill_dependency_graph
+    skill = Skill()
+            ^^^^^^^
+<string>:4: in __init__
+    ???
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\state.py:591: in _initialize_instance
+    manager.dispatch.init(self, args, kwargs)
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\event\attr.py:515: in __call__
+    fn(*args, **kw)
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\mapper.py:4419: in _event_on_init
+    instrumenting_mapper._check_configure()
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\mapper.py:2410: in _check_configure
+    _configure_registries({self.registry}, cascade=True)
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\mapper.py:4227: in _configure_registries
+    _do_configure_registries(registries, cascade)
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\mapper.py:4268: in _do_configure_registries
+    mapper._post_configure_properties()
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\mapper.py:2427: in _post_configure_properties
+    prop.init()
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\interfaces.py:595: in init
+    self.do_init()
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\relationships.py:1660: in do_init
+    self._generate_backref()
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\relationships.py:2086: in _generate_backref
+    raise sa_exc.ArgumentError(
+E   sqlalchemy.exc.ArgumentError: Error creating backref 'learning_paths' on relationship 'LearningPath.target_role': property of that name exists on mapper 'Mapper[JobRole(job_roles)]'
+---------------------------- Captured stdout call -----------------------------
+\U0001f9ea Testing Skill Dependency Graph (DAG)...
+____________________________ test_topological_sort ____________________________
+test_ai_depth.py:91: in test_topological_sort
+    sorted_skills = LearningService._topological_sort(mock_db, skill_ids)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+services\learning_service.py:196: in _topological_sort
+    skill_map = {s.id: s for s in all_skills}
+                                  ^^^^^^^^^^
+E   TypeError: 'Mock' object is not iterable
+---------------------------- Captured stdout call -----------------------------
+\U0001f9ea Testing Topological Sort for Learning Paths...
+______________________ test_explainable_career_matching _______________________
+test_ai_depth.py:134: in test_explainable_career_matching
+    patch('services.career_service.CareerService._get_role_requirements', return_value=requirements):
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\unittest\mock.py:1497: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\unittest\mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <class 'services.career_service.CareerService'> does not have the attribute '_get_role_requirements'
+---------------------------- Captured stdout call -----------------------------
+\U0001f9ea Testing Explainable Career Matching...
+_________________________ test_learning_path_endpoint _________________________
+test_critical_endpoints.py:76: in test_learning_path_endpoint
+    sorted_ids = LearningService._topological_sort(mock_db, skill_ids)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+services\learning_service.py:196: in _topological_sort
+    skill_map = {s.id: s for s in all_skills}
+                                  ^^^^^^^^^^
+E   TypeError: 'Mock' object is not iterable
+---------------------------- Captured stdout call -----------------------------
+\U0001f9ea Testing Learning Path Generation...
+_______________________________ test_user_model _______________________________
+test_security.py:193: in test_user_model
+    user = User.create(mock_db_session, 'admin@test.com', 'Admin User', 'password123', 'ADMIN', 'Developer')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+models\user.py:97: in create
+    user = cls(email=email, name=name, role=role, current_role=current_role)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<string>:4: in __init__
+    ???
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\state.py:591: in _initialize_instance
+    manager.dispatch.init(self, args, kwargs)
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\event\attr.py:515: in __call__
+    fn(*args, **kw)
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\mapper.py:4419: in _event_on_init
+    instrumenting_mapper._check_configure()
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\mapper.py:2410: in _check_configure
+    _configure_registries({self.registry}, cascade=True)
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\mapper.py:4227: in _configure_registries
+    _do_configure_registries(registries, cascade)
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sqlalchemy\orm\mapper.py:4264: in _do_configure_registries
+    raise e
+E   sqlalchemy.exc.InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'Mapper[LearningPath(learning_paths)]'. Original exception was: Error creating backref 'learning_paths' on relationship 'LearningPath.target_role': property of that name exists on mapper 'Mapper[JobRole(job_roles)]'
+---------------------------- Captured stdout call -----------------------------
+\U0001f9ea Testing User Model...
+______________________________ test_auth_service ______________________________
+test_security.py:217: in test_auth_service
+    result = AuthService.register_user(mock_db_session, 'user@test.com', 'Test User', 'Test1234', 'user')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+services\auth_service.py:64: in register_user
+    raise ValueError("User with this email already exists")
+E   ValueError: User with this email already exists
+---------------------------- Captured stdout call -----------------------------
+\U0001f9ea Testing Auth Service...
+============================== warnings summary ===============================
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\starlette\formparsers.py:10
+  C:\Users\windows-11\AppData\Local\Programs\Python\Python313\Lib\site-packages\starlette\formparsers.py:10: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+test_migration.py::test_model_imports
+  C:\Users\windows-11\AppData\Local\Programs\Python\Python313\Lib\site-packages\_pytest\python.py:170: PytestReturnNotNoneWarning: Test functions should return None, but test_migration.py::test_model_imports returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+test_migration.py::test_database_connection
+  C:\Users\windows-11\AppData\Local\Programs\Python\Python313\Lib\site-packages\_pytest\python.py:170: PytestReturnNotNoneWarning: Test functions should return None, but test_migration.py::test_database_connection returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+test_migration.py::test_user_crud
+  C:\Users\windows-11\AppData\Local\Programs\Python\Python313\Lib\site-packages\_pytest\python.py:170: PytestReturnNotNoneWarning: Test functions should return None, but test_migration.py::test_user_crud returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+test_migration.py::test_skill_crud
+  C:\Users\windows-11\AppData\Local\Programs\Python\Python313\Lib\site-packages\_pytest\python.py:170: PytestReturnNotNoneWarning: Test functions should return None, but test_migration.py::test_skill_crud returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+test_migration.py::test_user_skill_crud
+  C:\Users\windows-11\AppData\Local\Programs\Python\Python313\Lib\site-packages\_pytest\python.py:170: PytestReturnNotNoneWarning: Test functions should return None, but test_migration.py::test_user_skill_crud returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+test_migration.py::test_skill_assessment_crud
+  C:\Users\windows-11\AppData\Local\Programs\Python\Python313\Lib\site-packages\_pytest\python.py:170: PytestReturnNotNoneWarning: Test functions should return None, but test_migration.py::test_skill_assessment_crud returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+test_migration.py::test_job_role_crud
+  C:\Users\windows-11\AppData\Local\Programs\Python\Python313\Lib\site-packages\_pytest\python.py:170: PytestReturnNotNoneWarning: Test functions should return None, but test_migration.py::test_job_role_crud returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+test_migration.py::test_chat_session_crud
+  C:\Users\windows-11\AppData\Local\Programs\Python\Python313\Lib\site-packages\_pytest\python.py:170: PytestReturnNotNoneWarning: Test functions should return None, but test_migration.py::test_chat_session_crud returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+test_migration.py::test_relationships
+  C:\Users\windows-11\AppData\Local\Programs\Python\Python313\Lib\site-packages\_pytest\python.py:170: PytestReturnNotNoneWarning: Test functions should return None, but test_migration.py::test_relationships returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED test_ai_depth.py::test_skill_dependency_graph - sqlalchemy.exc.Argumen...
+FAILED test_ai_depth.py::test_topological_sort - TypeError: 'Mock' object is ...
+FAILED test_ai_depth.py::test_explainable_career_matching - AttributeError: <...
+FAILED test_critical_endpoints.py::test_learning_path_endpoint - TypeError: '...
+FAILED test_security.py::test_user_model - sqlalchemy.exc.InvalidRequestError...
+FAILED test_security.py::test_auth_service - ValueError: User with this email...
+================== 6 failed, 15 passed, 10 warnings in 6.61s ==================

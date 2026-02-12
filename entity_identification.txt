@@ -1,0 +1,158 @@
+# Core Entities and Their Interactions for AI-based Skill Gap Analysis and Career Recommendation System
+
+## Core Entities Analysis
+
+### 1. User
+**Responsibilities:**
+- Stores user profile information (email, name, phone, role)
+- Manages authentication credentials (password hash)
+- Tracks user creation and update timestamps
+- Links to all user-specific data (skills, assessments, learning paths)
+
+**Why Required:**
+- Central entity for personalization and security
+- Enables role-based access control (user vs admin)
+- Foundation for all user interactions with the system
+
+### 2. Skill
+**Responsibilities:**
+- Defines available skills with descriptions and categories
+- Tracks skill demand levels and dependencies
+- Provides metadata for skill assessments and recommendations
+
+**Why Required:**
+- Core domain entity representing competencies
+- Enables categorization and dependency management
+- Supports AI algorithms for gap analysis and recommendations
+
+### 3. UserSkill
+**Responsibilities:**
+- Records user's proficiency in specific skills
+- Stores confidence levels and assessment scores
+- Tracks assessment history and versions
+- Links users to their skill profiles
+
+**Why Required:**
+- Prevents data overwriting between users
+- Enables personalized skill gap analysis
+- Supports version control for skill progression tracking
+
+### 4. Career (JobRole)
+**Responsibilities:**
+- Defines career paths with titles and descriptions
+- Stores market data (salary, demand, growth rates)
+- Links to required skills for each career
+
+**Why Required:**
+- Target entity for career recommendations
+- Provides context for skill gap calculations
+- Enables market-aware career guidance
+
+### 5. CareerSkill (RoleSkillRequirement)
+**Responsibilities:**
+- Maps skills to careers with required proficiency levels
+- Defines skill importance and weighting for matching
+- Supports career-specific skill requirements
+
+**Why Required:**
+- Enables precise career-skill matching algorithms
+- Supports weighted recommendation scoring
+- Allows customization of career requirements
+
+### 6. SkillAssessment
+**Responsibilities:**
+- Records assessment sessions and results
+- Stores assessment status and completion timestamps
+- Links to detailed assessment skills data
+
+**Why Required:**
+- Tracks formal skill evaluation processes
+- Provides historical assessment data
+- Supports progress monitoring and analytics
+
+### 7. LearningPath
+**Responsibilities:**
+- Defines personalized learning journeys for career transitions
+- Tracks progress and completion status
+- Links to target careers and learning steps
+
+**Why Required:**
+- Provides actionable guidance for skill development
+- Enables progress tracking and motivation
+- Supports structured career advancement
+
+### 8. LearningResource
+**Responsibilities:**
+- Provides learning materials for skill development
+- Stores resource metadata (type, provider, difficulty, cost)
+- Links to specific skills for targeted learning
+
+**Why Required:**
+- Offers concrete learning paths for skill gaps
+- Supports multiple resource types (courses, tutorials, books)
+- Enables personalized learning recommendations
+
+### 9. Admin
+**Responsibilities:**
+- Manages system-wide data (users, skills, careers)
+- Oversees platform operations and analytics
+- Handles user role assignments and permissions
+
+**Why Required:**
+- Enables platform administration and maintenance
+- Supports content management and user oversight
+- Ensures system governance and compliance
+
+## Entity Interactions
+
+### User ↔ UserSkill ↔ Skill
+- Users assess their skills, creating UserSkill records
+- Skills provide metadata for assessments
+- Enables personalized skill profiles
+
+### User ↔ SkillAssessment ↔ SkillAssessmentSkill ↔ Skill
+- Users complete assessments for multiple skills
+- Assessments generate detailed skill proficiency data
+- Supports comprehensive skill evaluation with granular results
+
+### User ↔ LearningPath ↔ LearningPathStepAssociation ↔ LearningPathStep ↔ Skill
+- Users generate learning paths for target careers
+- Learning paths provide step-by-step skill development
+- Enables career transition planning with progress tracking
+
+### JobRole ↔ RoleSkillRequirement ↔ Skill
+- Careers require specific skills at defined levels
+- Skills are mapped to multiple careers with different requirements
+- Supports flexible career-skill relationships
+
+### Skill ↔ LearningResource
+- Skills link to learning materials and resources
+- Resources provide concrete learning paths
+- Supports skill development recommendations
+
+### User ↔ ChatSession ↔ ChatMessage
+- Users engage in AI-powered career conversations
+- Sessions group messages for context
+- Enables personalized career guidance through chat
+
+### Admin ↔ All Entities
+- Admins manage users, skills, careers, and system data
+- Enables content curation and platform maintenance
+- Supports system-wide operations
+
+## Data Flow Patterns
+
+1. **Assessment Flow**: User → SkillAssessment → UserSkill updates
+2. **Recommendation Flow**: UserSkill + CareerSkill → AI Engine → Recommendation
+3. **Learning Flow**: Recommendation → LearningPath generation → Progress tracking
+4. **Admin Flow**: Admin → Entity management → System updates
+
+## Design Principles Applied
+
+- **Normalization**: Separate tables prevent data redundancy
+- **Relationships**: Foreign keys ensure data integrity
+- **Extensibility**: Design supports adding new skills/careers easily
+- **Performance**: Indexes on foreign keys optimize queries
+- **Security**: User isolation prevents data cross-contamination
+
+This entity design provides a solid foundation for a scalable, maintainable system that can evolve with changing requirements while maintaining data integrity and performance.

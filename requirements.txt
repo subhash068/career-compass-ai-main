@@ -1,0 +1,83 @@
+# Functional Requirements
+
+1. User Registration and Authentication
+   - Users must be able to register with email, name, and password
+   - Secure login mechanism with JWT tokens
+   - Password hashing using bcrypt for security
+   - Role-based access control (user, admin)
+
+2. Skill Management
+   - Users can add and assess their skills
+   - Skills are categorized and have demand levels
+   - Skill dependencies are tracked
+   - Users can update skill levels and confidence scores
+
+3. Skill Gap Analysis
+   - System calculates skill gaps based on user skills vs. required skills for careers
+   - Gap analysis includes confidence levels and scores
+   - Real-time analysis after skill assessments
+
+4. Career Recommendation
+   - AI-powered career matching based on user skill profile
+   - Recommendations include match scores and growth potential
+   - Career data includes salary, demand, and growth rates
+
+5. Learning Path Generation
+   - Generate customized learning paths to bridge skill gaps
+   - Learning paths include step-by-step guides with resources
+   - Progress tracking for learning path completion
+
+6. Interactive Chatbot
+   - AI-powered chatbot for career advice and queries
+   - Session-based conversations with message history
+   - Integration with skill and career data
+
+7. Admin Dashboard
+   - Admin can manage users, skills, and careers
+   - User management with role assignments
+   - Career and skill data administration
+   - System monitoring and analytics
+
+8. Assessment System
+   - Skill assessment tests with multiple-choice and written components
+   - Assessment results stored with scores and confidence levels
+   - Historical assessment tracking
+
+# Non-Functional Requirements
+
+1. Security
+   - Secure authentication with JWT and refresh tokens
+   - Password encryption using bcrypt
+   - Input validation and sanitization
+   - Protection against common web vulnerabilities (XSS, CSRF, SQL injection)
+
+2. Performance
+   - Fast response times (<2 seconds for API calls)
+   - Scalable database design with proper indexing
+   - Efficient AI algorithms for recommendations
+   - Caching for frequently accessed data
+
+3. Scalability
+   - Modular architecture for easy expansion
+   - Database normalization to prevent redundancy
+   - Horizontal scaling capabilities for backend services
+
+4. Usability
+   - Intuitive user interface with responsive design
+   - Clear navigation and user feedback
+   - Accessibility compliance (WCAG guidelines)
+
+5. Reliability
+   - High availability with error handling
+   - Data backup and recovery mechanisms
+   - Comprehensive logging and monitoring
+
+6. Maintainability
+   - Clean, documented code with best practices
+   - Modular design for easy updates
+   - Comprehensive testing (unit, integration, end-to-end)
+
+7. Compatibility
+   - Cross-browser compatibility for frontend
+   - Mobile-responsive design
+   - API versioning for backward compatibility

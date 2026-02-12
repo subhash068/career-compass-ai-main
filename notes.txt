@@ -1,0 +1,201 @@
+Admin Dashboard Access Credentials:
+Email: admin@careercompass.ai
+Password: AdminPass123!
+
+How to Access:
+Start the application:
+
+
+cd frontend && npm run dev
+Login with admin credentials:
+
+Go to http://localhost:5173
+Enter the admin email and password
+Click login
+Access Admin Dashboard:
+
+After login, navigate to http://localhost:5173/admin
+Or click any admin-related navigation if available
+What You'll See:
+System Health Section: API status, version, and last health check
+System Metrics Section: CPU usage, memory usage, disk usage, and system uptime
+Admin Badge: Visual indicator of admin role
+Responsive Design: Works on desktop, tablet, and mobile
+The dashboard will automatically fetch real-time data from the backend APIs and display it with proper loading states and error handling. Non-admin users will be redirected to the regular dashboard if they try to access /admin.
+
+
+
+
+
+
+
+
+Backend (~95% Complete)
+API Endpoints Implemented:
+Authentication (/auth):
+
+POST /auth/register - User registration with password hashing
+POST /auth/login - JWT token-based login
+GET /auth/profile - User profile retrieval
+POST /auth/refresh - Token refresh functionality
+Skills (/skills):
+
+POST /skills/submit - Skill assessment submission with confidence weighting
+GET /skills/analyze - Skills analysis and insights
+Career (/career):
+
+GET /career/recommend - Career recommendations based on skills
+Learning (/learning):
+
+POST /learning/path - Generate personalized learning paths
+GET /learning/path - Retrieve learning paths
+PUT /learning/path/step/{step_id} - Update learning progress
+Chatbot (/chatbot):
+
+POST /chatbot/query - AI-powered career advice queries
+Admin (/admin):
+
+Admin-specific endpoints for platform management
+Status (/):
+
+GET /status - Service health check with database connectivity
+Services Layer:
+AuthService: Complete authentication with bcrypt password hashing, JWT token management, user registration/validation
+SkillsService: ML-based skill analysis using TF-IDF similarity, confidence-weighted scoring, skill assessment processing
+CareerService: Career matching algorithms
+LearningService: Learning path generation and progress tracking
+ChatbotService: AI integration for career guidance
+SkillsService: Duplicate? Wait, likely consolidated
+Security Features:
+JWT authentication with access/refresh tokens
+Password hashing with bcrypt
+Role-based access control (user/admin)
+CORS middleware
+Input validation and sanitization
+Database (~100% Complete)
+Models Implemented:
+User: Authentication, roles, profile data
+Skill: Skill definitions and metadata
+UserSkill: User-skill relationships with levels and scores
+SkillAssessment: Assessment records
+JobRole: Career positions and requirements
+RoleSkillRequirement: Job-skill mappings
+LearningPath: Structured learning journeys
+LearningPathStep: Individual learning steps
+LearningResource: Educational materials
+ChatMessage: Chatbot conversation history
+ChatSession: Chat session management
+Database Features:
+SQLAlchemy ORM with proper relationships
+SQLite database with migration support (Alembic)
+Database connection pooling and session management
+Table creation and health checks
+Frontend (~95% Complete)
+Pages Implemented:
+Index: Landing page
+Login: Authentication interface
+Dashboard: Main user dashboard with stats and overview
+Assessment: Skills assessment form
+Careers: Career recommendations display
+Learning: Learning paths and progress tracking
+Assistant: AI chatbot interface
+AdminDashboard: Administrative controls
+GapAnalysis: Skills gap identification
+Settings: User preferences
+NotFound: 404 error page
+Components Library:
+UI Components: Complete shadcn-ui implementation (buttons, forms, tables, charts, dialogs, etc.)
+Layout Components: MainLayout, Sidebar, navigation
+Dashboard Components: SkillsOverview, TopGaps, CareerMatches, RecentActivity, StatCard
+Auth Components: AuthWrapper, ProtectedRoute, AuthContext
+Charts: Data visualization components
+Forms: Assessment forms, settings forms
+Frontend Features:
+State Management: React Context for authentication and app state
+API Integration: Axios client with interceptors for auth
+Routing: React Router with protected routes
+Styling: Tailwind CSS with custom components
+TypeScript: Full type safety
+Responsive Design: Mobile-friendly layouts
+Development Setup:
+Vite build system
+ESLint configuration
+Vitest testing framework
+TypeScript configuration
+Infrastructure (~90% Complete)
+Docker: Containerization for backend and frontend
+Nginx: Reverse proxy configuration
+Prometheus: Monitoring setup
+Deployment: Docker Compose for local development
+Testing & Quality (~70% Complete)
+Multiple test scripts for critical endpoints
+Security testing suite
+Migration verification tests
+AI depth testing
+Basic unit tests setup
+Remaining Work (~5%):
+Complete end-to-end testing of registration/login flow
+Minor frontend optimizations (profile fetching, meta tags)
+Final integration testing
+Documentation updates
+Performance optimizations
+
+
+
+
+JWT_SECRET_KEY=your-secret-key-here-change-this-in-production
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+JWT_SECRET_KEY=your-secret-key-here-change-this-in-production
+-# DATABASE_URL_DEV=sqlite:///./career_compass.db
+-ENVIRONMENT=development
+-# Database URLs
+-DATABASE_URL_DEV=mysql+mysqlconnector://root:kali@localhost/career_compass
+-DATABASE_URL_TEST=sqlite:///./test_career_compass.db
+-DATABASE_URL_PROD=mysql+mysqlconnector://user:password@prod-host/career_compass
+-
+-# SQLAlchemy Configuration
+-SQLALCHEMY_ECHO=false  # Set to true for SQL logging
+-
+-# Redis Configuration
+-REDIS_URL=redis://localhost:6379
+-
+-# JWT Configuration (for FastAPI)
+-# JWT_SECRET_KEY=your-secret-key-here
+-JWT_ACCESS_TOKEN_EXPIRES=900  # 15 minutes
+-JWT_REFRESH_TOKEN_EXPIRES=604800  # 7 days
+-
+-# Other configurations (if needed)
+-# Flask Application Configuration
+-
+-REDIS_URL=redis://redis:6379
+-
+-# Flask Environment
+-FLASK_ENV=development
+-FLASK_DEBUG=1
+-
+-# CORS Origins (for development)
+-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+-
+-# Prometheus Metrics
+-PROMETHEUS_METRICS_ENABLED=true
++JWT_SECRET_KEY=your-secret-key-here-change-this-in-production
++ENVIRONMENT=development
++DATABASE_URL_DEV=sqlite:///./career_compass.db
+ \ No newline at end of file
+ 

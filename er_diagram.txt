@@ -1,0 +1,268 @@
+# MySQL ER Diagram for AI-based Skill Gap Analysis and Career Recommendation System
+
+## Database Schema Overview
+
+This ER diagram represents the actual normalized relational database design implemented in the Career Compass AI project using SQLAlchemy models. The design follows third normal form (3NF) principles and prevents data redundancy while ensuring data integrity.
+
+## Tables and Relationships
+
+### 1. users
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- email: VARCHAR(255) (UNIQUE, NOT NULL)
+- name: VARCHAR(255) (NOT NULL)
+- phone: VARCHAR(20)
+- password_hash: VARCHAR(255) (NOT NULL)
+- role: VARCHAR(50) (DEFAULT 'user')
+- current_role: VARCHAR(255) (DEFAULT '')
+- created_at: DATETIME (DEFAULT CURRENT_TIMESTAMP)
+- updated_at: DATETIME (DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)
+
+**Relationships:**
+- 1:N with user_skills (user_id FK)
+- 1:N with skill_assessments (user_id FK)
+- 1:N with learning_paths (user_id FK)
+- 1:N with chat_sessions (user_id FK)
+
+### 2. skills
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- name: VARCHAR(255) (NOT NULL)
+- description: TEXT
+- category_id: VARCHAR(255)
+- demand_level: INT (DEFAULT 0)
+- depends_on: TEXT (DEFAULT '[]') // JSON array of skill dependencies
+
+**Relationships:**
+- 1:N with user_skills (skill_id FK)
+- 1:N with role_skill_requirements (skill_id FK)
+- 1:N with skill_assessment_skills (skill_id FK)
+- 1:N with learning_path_steps (skill_id FK)
+- 1:N with learning_resources (skill_id FK)
+
+### 3. user_skills
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Foreign Keys:**
+- user_id → users.id
+- skill_id → skills.id
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- user_id: INT (FK, NOT NULL, INDEX)
+- skill_id: INT (FK, NOT NULL, INDEX)
+- level: VARCHAR(50) (DEFAULT 'beginner')
+- confidence: INT (DEFAULT 50)
+- score: FLOAT (DEFAULT 0.0)
+- assessed_at: DATETIME (DEFAULT CURRENT_TIMESTAMP)
+- version: INT (DEFAULT 1)
+
+**Unique Constraint:** (user_id, skill_id) - prevents duplicate user-skill entries
+**Indexes:** idx_user_skill_user_id, idx_user_skill_skill_id, idx_user_skill_user_skill
+
+### 4. job_roles
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- title: VARCHAR(255) (NOT NULL)
+- description: TEXT
+- level: VARCHAR(50) (DEFAULT 'mid')
+- average_salary: TEXT (DEFAULT '{}') // JSON object
+- demand_score: FLOAT (DEFAULT 0.0)
+- growth_rate: FLOAT (DEFAULT 0.0)
+
+**Relationships:**
+- 1:N with role_skill_requirements (role_id FK)
+- 1:N with learning_paths (target_role_id FK)
+
+**Indexes:** idx_job_role_title, idx_job_role_level
+
+### 5. role_skill_requirements
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Foreign Keys:**
+- role_id → job_roles.id
+- skill_id → skills.id
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- role_id: INT (FK, NOT NULL, INDEX)
+- skill_id: INT (FK, NOT NULL, INDEX)
+- required_level: VARCHAR(50) (DEFAULT 'beginner')
+- importance: VARCHAR(50) (DEFAULT 'preferred')
+- weight: FLOAT (DEFAULT 0.5)
+
+**Unique Constraint:** (role_id, skill_id) - each skill-role combination is unique
+**Indexes:** idx_role_skill_req_role_id, idx_role_skill_req_skill_id, idx_role_skill_req_role_skill
+
+### 6. skill_assessments
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Foreign Keys:**
+- user_id → users.id
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- user_id: INT (FK, NOT NULL, INDEX)
+- status: VARCHAR(50) (DEFAULT 'completed')
+- completed_at: DATETIME (DEFAULT CURRENT_TIMESTAMP)
+- created_at: DATETIME (DEFAULT CURRENT_TIMESTAMP)
+
+**Relationships:**
+- 1:N with skill_assessment_skills (assessment_id FK)
+
+**Indexes:** idx_skill_assessment_user_id, idx_skill_assessment_created_at
+
+### 7. skill_assessment_skills
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Foreign Keys:**
+- assessment_id → skill_assessments.id
+- skill_id → skills.id
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- assessment_id: INT (FK, NOT NULL, INDEX)
+- skill_id: INT (FK, NOT NULL, INDEX)
+- level: VARCHAR(50) (DEFAULT 'beginner')
+- confidence: INT (DEFAULT 50)
+- score: FLOAT (DEFAULT 0.0)
+- written_assessment: TEXT
+
+**Indexes:** idx_assessment_skill_assessment_id, idx_assessment_skill_skill_id
+
+### 8. learning_paths
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Foreign Keys:**
+- user_id → users.id
+- target_role_id → job_roles.id
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- user_id: INT (FK, NOT NULL, INDEX)
+- target_role_id: INT (FK, NOT NULL, INDEX)
+- total_duration: VARCHAR(100)
+- progress: INT (DEFAULT 0)
+- created_at: DATETIME (DEFAULT CURRENT_TIMESTAMP)
+- updated_at: DATETIME (DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)
+
+**Relationships:**
+- 1:N with learning_path_step_associations (learning_path_id FK)
+
+**Indexes:** idx_learning_path_user_id, idx_learning_path_target_role_id, idx_learning_path_created_at
+
+### 9. learning_path_steps
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Foreign Keys:**
+- skill_id → skills.id
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- skill_id: INT (FK, NOT NULL, INDEX)
+- target_level: VARCHAR(50) (DEFAULT 'beginner')
+- order: INT (DEFAULT 0)
+- estimated_duration: VARCHAR(100)
+- resources: TEXT (DEFAULT '[]') // JSON array
+- dependencies: TEXT (DEFAULT '[]') // JSON array
+- is_completed: BOOLEAN (DEFAULT FALSE)
+
+**Relationships:**
+- 1:N with learning_path_step_associations (step_id FK)
+
+**Indexes:** idx_learning_path_step_skill_id, idx_learning_path_step_order
+
+### 10. learning_path_step_associations
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Foreign Keys:**
+- learning_path_id → learning_paths.id
+- step_id → learning_path_steps.id
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- learning_path_id: INT (FK, NOT NULL, INDEX)
+- step_id: INT (FK, NOT NULL, INDEX)
+- order: INT (DEFAULT 0)
+- is_completed: BOOLEAN (DEFAULT FALSE)
+
+**Indexes:** idx_path_step_assoc_learning_path_id, idx_path_step_assoc_step_id
+
+### 11. learning_resources
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Foreign Keys:**
+- skill_id → skills.id
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- skill_id: INT (FK, NOT NULL, INDEX)
+- title: VARCHAR(255) (NOT NULL)
+- type: VARCHAR(50) (DEFAULT 'course')
+- provider: VARCHAR(255)
+- url: TEXT
+- duration: VARCHAR(100)
+- difficulty: VARCHAR(50) (DEFAULT 'beginner')
+- rating: FLOAT (DEFAULT 0.0)
+- cost: VARCHAR(50) (DEFAULT 'free')
+
+**Indexes:** idx_learning_resource_skill_id, idx_learning_resource_type, idx_learning_resource_difficulty
+
+### 12. chat_sessions
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Foreign Keys:**
+- user_id → users.id
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- user_id: INT (FK, NOT NULL, INDEX)
+- created_at: DATETIME (DEFAULT CURRENT_TIMESTAMP)
+- updated_at: DATETIME (DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)
+
+**Relationships:**
+- 1:N with chat_messages (session_id FK)
+
+**Indexes:** idx_chat_session_user_id, idx_chat_session_created_at
+
+### 13. chat_messages
+**Primary Key:** id (INT, AUTO_INCREMENT)
+**Foreign Keys:**
+- session_id → chat_sessions.id
+**Columns:**
+- id: INT (PK, AUTO_INCREMENT)
+- session_id: INT (FK, NOT NULL, INDEX)
+- role: VARCHAR(50) (NOT NULL)
+- content: TEXT (NOT NULL)
+- timestamp: DATETIME (DEFAULT CURRENT_TIMESTAMP)
+- context: TEXT (DEFAULT '{}') // JSON object
+
+**Indexes:** idx_chat_message_session_id, idx_chat_message_timestamp
+
+## ER Diagram Notation
+
+### Relationships:
+- **users --1:N-- user_skills**: One user can have many skill assessments
+- **skills --1:N-- user_skills**: One skill can be assessed by many users
+- **users --1:N-- skill_assessments**: One user can have many assessment sessions
+- **skill_assessments --1:N-- skill_assessment_skills**: One assessment contains many skill results
+- **skills --1:N-- skill_assessment_skills**: Skills are referenced in assessments
+- **job_roles --1:N-- role_skill_requirements**: One job role requires many skills
+- **skills --1:N-- role_skill_requirements**: One skill is required for many job roles
+- **users --1:N-- learning_paths**: One user can have many learning paths
+- **job_roles --1:N-- learning_paths**: One job role can be targeted by many learning paths
+- **learning_paths --1:N-- learning_path_step_associations**: One learning path has many steps
+- **learning_path_steps --1:N-- learning_path_step_associations**: One step can be in many learning paths
+- **users --1:N-- chat_sessions**: One user can have many chat sessions
+- **chat_sessions --1:N-- chat_messages**: One session contains many messages
+
+### Cardinality:
+- All relationships are 1:N (one-to-many)
+- Foreign key constraints ensure referential integrity
+- Unique constraints prevent duplicate entries where required
+
+## Design Principles Applied
+
+1. **Normalization**: 3NF achieved - no transitive dependencies
+2. **Data Integrity**: Foreign keys and constraints prevent orphaned records
+3. **Performance**: Strategic indexing on foreign keys and commonly queried columns
+4. **Scalability**: Design supports growth without restructuring
+5. **Flexibility**: JSON fields allow for extensible data storage
+6. **Security**: User data isolation through proper relationships
+
+## MySQL Workbench Implementation Notes
+
+To implement this in MySQL Workbench:
+1. Create new EER Diagram
+2. Add tables with specified columns and data types
+3. Create relationships by dragging foreign keys
+4. Add indexes and unique constraints
+5. Generate SQL script for database creation
+6. Forward engineer to create actual database
+
+This schema provides a robust foundation for the AI-based career recommendation system, ensuring data consistency, performance, and maintainability.
