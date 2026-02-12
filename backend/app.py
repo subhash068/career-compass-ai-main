@@ -35,6 +35,9 @@ from routes.career import router as career_router
 from routes.learning import router as learning_router
 from routes.chatbot import router as chatbot_router
 from routes.admin import router as admin_router
+from routes.admin_quiz import router as admin_quiz_router
+from routes.admin_logs import router as admin_logs_router
+
 
 # DATABASE_URL from models.database
 
@@ -81,6 +84,9 @@ app.include_router(career_router, tags=["Career"])
 app.include_router(learning_router, tags=["Learning"])
 app.include_router(chatbot_router, tags=["Chatbot"])
 app.include_router(admin_router, tags=["Admin"])
+app.include_router(admin_quiz_router, tags=["Admin Quiz"])
+app.include_router(admin_logs_router, tags=["Admin Logs"])
+
 
 
 # -----------------------------

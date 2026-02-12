@@ -7,8 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/auth/AuthContext';
 import { authApi } from '@/api/auth.api';
 import { LogIn, UserPlus, Check, X, Mail, Shield, Clock, Eye, EyeOff } from 'lucide-react';
+
+
 
 type AuthMode = 'login' | 'register' | 'verify' | 'forgotPassword' | 'resetPassword';
 
@@ -37,6 +40,8 @@ export default function Login() {
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { login: authLogin } = useAuth();
+
 
   // Password strength validation
   const validatePassword = (password: string) => {
@@ -143,28 +148,54 @@ export default function Login() {
       } else if (mode === 'login') {
         console.log('Login attempt with email:', email, 'password:', password);
         try {
-          const data = await authApi.login({ email, password });
-          // Store token and user data
-          localStorage.setItem('authToken', data.access_token);
-          if (data.refresh_token) {
-            localStorage.setItem('refreshToken', data.refresh_token);
+          // Use AuthContext login to properly update state
+          const success = await authLogin(email, password);
+          
+          if (!success) {
+            setError('Login failed. Please check your credentials.');
+            setIsLoading(false);
+            return;
           }
-          localStorage.setItem('user', JSON.stringify(data.user));
+
+          // Get user data from localStorage (set by AuthContext)
+          const userStr = localStorage.getItem('user');
+          if (!userStr) {
+            setError('Login failed. User data not found.');
+            setIsLoading(false);
+            return;
+          }
+          
+          const user = JSON.parse(userStr);
 
           // Dispatch custom event to notify AuthWrapper of auth change
           window.dispatchEvent(new CustomEvent('authChange'));
 
           toast({
             title: "Login Successful",
-            description: `Welcome back, ${data.user.name}!`,
+            description: `Welcome back, ${user.name}!`,
           });
 
-          // Redirect based on user role
-          if (data.user.role.toUpperCase() === 'ADMIN') {
-            navigate('/admin');
-          } else {
-            navigate('/dashboard');
-          }
+          // Debug logging
+          console.log('Login successful. User role:', user.role);
+          console.log('Full user data:', user);
+          
+          // Redirect based on user role (case-insensitive check)
+          const userRole = user.role?.toLowerCase();
+          console.log('Normalized user role:', userRole);
+          
+          // Use setTimeout to ensure AuthContext updates before navigation
+          setTimeout(() => {
+            if (userRole === 'admin') {
+              console.log('Login.tsx: Redirecting admin to /admin');
+              navigate('/admin', { replace: true });
+            } else {
+              console.log('Login.tsx: Redirecting user to /dashboard');
+              navigate('/dashboard', { replace: true });
+            }
+          }, 100);
+
+
+
         } catch (err: any) {
           console.error('Login error:', err);
           if (err.response?.status === 401) {
@@ -350,15 +381,12 @@ export default function Login() {
           <br />
           <Button
             variant="link"
-            onClick={() => {
-              setMode('register');
-              setError('');
-              setPassword('');
-            }}
+            onClick={() => navigate('/register')}
             className="text-sm"
           >
             Don't have an account? Sign up
           </Button>
+
         </div>
       </CardContent>
     </>

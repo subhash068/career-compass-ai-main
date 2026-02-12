@@ -17,7 +17,6 @@ interface Domain {
   icon?: string;
 }
 
-
 interface Skill {
   id: number;
   name: string;
@@ -291,7 +290,7 @@ export default function SkillSelection() {
                             {isSelected && <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />}
                           </div>
                         </div>
-                        <Button
+                        {/* <Button
                           variant="outline"
                           size="sm"
                           className="ml-2 text-xs"
@@ -303,7 +302,7 @@ export default function SkillSelection() {
                           }}
                         >
                           Take Exam
-                        </Button>
+                        </Button> */}
 
                       </div>
                     </CardContent>

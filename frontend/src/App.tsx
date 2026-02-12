@@ -25,9 +25,16 @@ const Assistant = React.lazy(() => import("@/pages/Assistant"));
 const Profile = React.lazy(() => import("@/pages/Profile"));
 const Settings = React.lazy(() => import("@/pages/Settings"));
 const AdminDashboard = React.lazy(() => import("@/pages/admin/AdminDashboard"));
+const LandingPage = React.lazy(() => import("@/pages/LandingPage"));
 const Login = React.lazy(() => import("@/pages/Login"));
+const Register = React.lazy(() => import("@/pages/Register"));
+const About = React.lazy(() => import("@/pages/About"));
+const PrivacyPolicy = React.lazy(() => import("@/pages/PrivacyPolicy"));
+const TermsOfService = React.lazy(() => import("@/pages/TermsOfService"));
+const CookiePolicy = React.lazy(() => import("@/pages/CookiePolicy"));
 const SkillExam = React.lazy(() => import("@/pages/SkillExam"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
+
 
 const queryClient = new QueryClient();
 
@@ -61,10 +68,19 @@ const App = () => (
                     <MainLayout>
                     <Suspense fallback={<PageLoader />}>
                       <Routes>
-                        <Route path="/" element={<Login />} />
+                        <Route path="/" element={<LandingPage />} />
                         <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/about" element={<About />} />
+                        <Route path="/privacy" element={<PrivacyPolicy />} />
+                        <Route path="/terms" element={<TermsOfService />} />
+                        <Route path="/cookies" element={<CookiePolicy />} />
                         <Route path="/skill_selection" element={<SkillSelection />} />
-                        <Route path="/skill_selection/assessment/exam" element={<SkillExam />} />
+                        <Route path="/skill_selection/assessment/exam" element={
+                          <ProtectedRoute>
+                            <SkillExam />
+                          </ProtectedRoute>
+                        } />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/skill_selection/assessment" element={<Assessment />} />
                         <Route path="/results" element={<Results />} />
@@ -75,7 +91,7 @@ const App = () => (
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/settings" element={<Settings />} />
                         <Route path="/admin" element={
-                          <ProtectedRoute requiredRole="ADMIN">
+                          <ProtectedRoute requiredRole="admin">
                             <AdminDashboard />
                           </ProtectedRoute>
                         } />

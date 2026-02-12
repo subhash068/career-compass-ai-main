@@ -13,6 +13,14 @@ const axiosClient = axios.create({
 axiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
+    const user = localStorage.getItem('user');
+
+    // Debug logging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Request:', config.method?.toUpperCase(), config.url);
+      console.log('Token exists:', !!token);
+      console.log('User exists:', !!user);
+    }
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -21,6 +29,7 @@ axiosClient.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+
 
 // Response interceptor for global error handling and retry
 axiosClient.interceptors.response.use(
@@ -37,11 +46,25 @@ axiosClient.interceptors.response.use(
       // Token expired or invalid, redirect to login
       localStorage.removeItem('authToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
       window.location.href = '/login';
 
     } else if (error.response?.status === 403) {
-      // Forbidden, show error
-      console.error('Access forbidden');
+      // Forbidden - check if user is actually admin
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          console.error('Access forbidden. User role:', user.role);
+          if (user.role !== 'admin') {
+            console.error('User is not admin. Redirecting to dashboard.');
+            window.location.href = '/dashboard';
+          }
+        } catch (e) {
+          console.error('Failed to parse user data');
+        }
+      }
+
     } else if (error.response?.status === 404) {
       // Not found - let the API layer handle it
       // The skills.api.ts already catches 404 and returns null

@@ -64,6 +64,132 @@ def get_user_details(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/users")
+def create_user(
+    user_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Create a new user (admin only)
+    """
+    try:
+        from services.auth_service import AuthService
+        from schemas.assessment import UserCreate
+        
+        # Check if email already exists
+        existing = db.query(User).filter(User.email == user_data.get("email")).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Create user using auth service
+        user_create = UserCreate(
+            email=user_data.get("email"),
+            name=user_data.get("name"),
+            password=user_data.get("password"),
+            role=user_data.get("role", "user")
+        )
+        
+        new_user = AuthService.create_user(db, user_create)
+        
+        # Update additional fields if provided
+        if user_data.get("currentRole"):
+            new_user.currentRole = user_data.get("currentRole")
+            db.commit()
+        
+        return {
+            "message": "User created successfully",
+            "user": {
+                "id": new_user.id,
+                "email": new_user.email,
+                "name": new_user.name,
+                "role": new_user.role,
+                "currentRole": new_user.currentRole
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/users/{user_id}")
+def update_user(
+    user_id: int,
+    user_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Update user details (admin only)
+    """
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update fields
+        if "name" in user_data:
+            user.name = user_data["name"]
+        
+        if "role" in user_data:
+            user.role = user_data["role"]
+        
+        if "currentRole" in user_data:
+            user.currentRole = user_data["currentRole"]
+        
+        # Update password if provided
+        if "password" in user_data and user_data["password"]:
+            from services.auth_service import AuthService
+            user.hashed_password = AuthService.get_password_hash(user_data["password"])
+        
+        db.commit()
+        db.refresh(user)
+        
+        return {
+            "message": "User updated successfully",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "role": user.role,
+                "currentRole": user.currentRole
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Delete a user (admin only)
+    """
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Prevent deleting yourself
+        if user.id == current_user.id:
+            raise HTTPException(status_code=400, detail="Cannot delete your own account")
+        
+        db.delete(user)
+        db.commit()
+        
+        return {"message": "User deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.put("/users/{user_id}/role")
 def update_user_role(
     user_id: int,
@@ -88,6 +214,7 @@ def update_user_role(
 
 @router.get("/assessments")
 def get_all_assessments(
+
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),

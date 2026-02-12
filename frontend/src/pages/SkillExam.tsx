@@ -66,23 +66,13 @@ export default function SkillExam() {
   useEffect(() => {
     const loadExam = async () => {
       try {
-        // Wait for auth to finish loading before checking user
+        // Wait for auth to finish loading before loading exam
         if (isAuthLoading) {
           return;
         }
 
-        if (!user) {
-          toast({
-            title: "Authentication required",
-            description: "Please log in to take the exam.",
-            variant: "destructive",
-          });
-          navigate('/login');
-          return;
-        }
-
-
         // Use skillId from state, URL params, or localStorage
+
         let currentSkillId = initialSkillId;
 
         if (!currentSkillId) {
@@ -128,22 +118,6 @@ export default function SkillExam() {
 
     loadExam();
   }, [skillName, user, isAuthLoading, navigate, toast, initialSkillId]);
-
-
-  // const generateMockQuestions = (skillName: string): Question[] => {
-  //   return Array.from({ length: 10 }, (_, i) => ({
-  //     id: i + 1,
-  //     question_text: `Question ${i + 1}: What is your understanding of ${skillName} concept ${i + 1}?`,
-  //     options: [
-  //       `Basic understanding of ${skillName}`,
-  //       `Intermediate knowledge with some practical experience`,
-  //       `Advanced expertise with multiple projects`,
-  //       `Expert level with deep architectural knowledge`
-  //     ],
-  //     correct_answer: `Advanced expertise with multiple projects`,
-  //     difficulty: i < 3 ? 'easy' : i < 7 ? 'medium' : 'hard'
-  //   }));
-  // };
 
   const handleAnswer = (questionId: number, answer: string) => {
     setAnswers(prev => ({

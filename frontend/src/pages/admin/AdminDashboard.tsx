@@ -1,32 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/auth/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Award, Target, MessageSquare, Activity } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { 
+  LayoutDashboard, 
+  Users, 
+  HelpCircle, 
+  Activity, 
+  FileText, 
+  TrendingUp,
+  Shield,
+  LogOut,
+  Menu,
+  X
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import axiosClient from '@/api/axiosClient';
+
+// Import admin components
 import UserManagementTable from '@/components/admin/UserManagementTable';
 import UserDetailsModal from '@/components/admin/UserDetailsModal';
 import CareerRecommendationEditor from '@/components/admin/CareerRecommendationEditor';
+import QuizManager from '@/components/admin/QuizManager';
+import SystemMonitor from '@/components/admin/SystemMonitor';
+import LogViewer from '@/components/admin/LogViewer';
+import CareerAnalytics from '@/components/admin/CareerAnalytics';
+import UserForm from '@/components/admin/UserForm';
 
-interface HealthData {
-  status: string;
-  timestamp: number;
-  version: string;
-}
-
-interface MetricsData {
-  system: {
-    cpu_percent: number;
-    memory_percent: number;
-    disk_usage_percent: number;
-    uptime_seconds: number;
-  };
-  timestamp: number;
-}
-
-interface OverviewMetrics {
+interface SystemStats {
   total_users: number;
   active_users: number;
   total_assessments: number;
@@ -35,271 +40,408 @@ interface OverviewMetrics {
 }
 
 export default function AdminDashboard() {
-  const [healthData, setHealthData] = useState<HealthData | null>(null);
-  const [metricsData, setMetricsData] = useState<MetricsData | null>(null);
-  const [overviewMetrics, setOverviewMetrics] = useState<OverviewMetrics | null>(null);
-  const [healthLoading, setHealthLoading] = useState(true);
-  const [metricsLoading, setMetricsLoading] = useState(true);
-  const [overviewLoading, setOverviewLoading] = useState(true);
-  const [healthError, setHealthError] = useState<string | null>(null);
-  const [metricsError, setMetricsError] = useState<string | null>(null);
-  const [overviewError, setOverviewError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { user: contextUser, logout } = useAuth();
+  
 
-  // Modal states
+  
+  // Check localStorage as fallback for immediate access after login
+  let user = contextUser;
+  if (!user) {
+    const userStr = localStorage.getItem('user');
+    if (userStr && userStr !== 'undefined') {
+      try {
+        user = JSON.parse(userStr);
+        console.log('AdminDashboard: Using user from localStorage:', user);
+      } catch (e) {
+        console.error('AdminDashboard: Error parsing user from localStorage:', e);
+      }
+    }
+  }
+
+  const [activeTab, setActiveTab] = useState('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [stats, setStats] = useState<SystemStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [showUserDetails, setShowUserDetails] = useState(false);
-  const [showCareerEditor, setShowCareerEditor] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isUserFormOpen, setIsUserFormOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Fetch system stats
 
   useEffect(() => {
-    fetchHealth();
-    fetchMetrics();
-    fetchOverviewMetrics();
+    fetchStats();
   }, []);
 
-  const fetchHealth = async () => {
+  const fetchStats = async () => {
     try {
-      setHealthLoading(true);
-      const response = await axiosClient.get('/admin/health');
-      setHealthData(response.data);
-      setHealthError(null);
-    } catch (error: any) {
-      setHealthError(error.response?.data?.detail || 'Failed to fetch health data');
-    } finally {
-      setHealthLoading(false);
-    }
-  };
-
-  const fetchMetrics = async () => {
-    try {
-      setMetricsLoading(true);
-      const response = await axiosClient.get('/admin/metrics');
-      setMetricsData(response.data);
-      setMetricsError(null);
-    } catch (error: any) {
-      setMetricsError(error.response?.data?.detail || 'Failed to fetch metrics data');
-    } finally {
-      setMetricsLoading(false);
-    }
-  };
-
-  const fetchOverviewMetrics = async () => {
-    try {
-      setOverviewLoading(true);
+      setStatsLoading(true);
       const response = await axiosClient.get('/admin/overview-metrics');
-      setOverviewMetrics(response.data);
-      setOverviewError(null);
-    } catch (error: any) {
-      setOverviewError(error.response?.data?.detail || 'Failed to fetch overview metrics');
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
     } finally {
-      setOverviewLoading(false);
+      setStatsLoading(false);
     }
   };
 
-  const formatUptime = (seconds: number) => {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${days}d ${hours}h ${minutes}m`;
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
+
+  const handleViewUser = (userId: number) => {
+    setSelectedUserId(userId);
+    setIsEditMode(false);
+    setIsUserModalOpen(true);
+  };
+
+  const handleEditUser = (userId: number) => {
+    setSelectedUserId(userId);
+    setIsEditMode(true);
+    setIsUserFormOpen(true);
+  };
+
+  const handleCreateUser = () => {
+    setSelectedUserId(null);
+    setIsEditMode(false);
+    setIsUserFormOpen(true);
+  };
+
+  const handleCloseUserModal = () => {
+    setIsUserModalOpen(false);
+    setSelectedUserId(null);
+  };
+
+  const handleCloseUserForm = () => {
+    setIsUserFormOpen(false);
+    setSelectedUserId(null);
+    setIsEditMode(false);
+  };
+
+  const handleUserFormSuccess = () => {
+    // Refresh user list if needed
+    handleCloseUserForm();
+  };
+
+
+  const navItems = [
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'users', label: 'User Management', icon: Users },
+    { id: 'quiz', label: 'Quiz Management', icon: HelpCircle },
+    { id: 'monitoring', label: 'System Monitor', icon: Activity },
+    { id: 'logs', label: 'Logs & Errors', icon: FileText },
+    { id: 'analytics', label: 'Career Analytics', icon: TrendingUp },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Monitor system health and metrics</p>
+    <div className="min-h-screen bg-background flex">
+      {/* Mobile Sidebar Toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-4 left-4 z-50 lg:hidden"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+      </Button>
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r transform transition-transform duration-200 lg:translate-x-0 lg:static",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+              <Shield className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="font-bold text-lg">Admin Panel</h1>
+              <p className="text-xs text-muted-foreground">Career Compass AI</p>
+            </div>
+          </div>
+
+          <nav className="space-y-2">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setSidebarOpen(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+                    activeTab === item.id
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="absolute bottom-6 left-6 right-6">
+            <div className="p-4 rounded-lg bg-muted mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-sm font-medium">
+                    {user?.name?.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                </div>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
-        <Badge variant="secondary" className="text-sm">
-          ADMIN
-        </Badge>
-      </div>
+      </aside>
 
-      {/* System Health Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>System Health</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {healthLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-4 w-20" />
+      {/* Main Content */}
+      <main className="flex-1 min-w-0 overflow-auto">
+        <div className="p-6 lg:p-8">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-bold">
+                {navItems.find(item => item.id === activeTab)?.label}
+              </h2>
+              <p className="text-muted-foreground">
+                Manage your platform and monitor performance
+              </p>
             </div>
-          ) : healthError ? (
-            <Alert variant="destructive">
-              <AlertDescription>{healthError}</AlertDescription>
-            </Alert>
-          ) : healthData ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">Status:</span>
-                <Badge variant={healthData.status === 'healthy' ? 'default' : 'destructive'}>
-                  {healthData.status}
-                </Badge>
-              </div>
-              <div>
-                <span className="font-medium">Version:</span> {healthData.version}
-              </div>
-              <div>
-                <span className="font-medium">Last Check:</span>{' '}
-                {new Date(healthData.timestamp * 1000).toLocaleString()}
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+            <Badge variant="outline" className="px-3 py-1">
+              <span className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse" />
+              System Online
+            </Badge>
+          </div>
 
-      {/* Overview Metrics Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Platform Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {overviewLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-16" />
-                </div>
-              ))}
-            </div>
-          ) : overviewError ? (
-            <Alert variant="destructive">
-              <AlertDescription>{overviewError}</AlertDescription>
-            </Alert>
-          ) : overviewMetrics ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <div className="text-sm font-medium text-muted-foreground">Total Users</div>
-                </div>
-                <div className="text-2xl font-bold">{overviewMetrics.total_users}</div>
+          {/* Content */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            {/* Overview Tab */}
+            <TabsContent value="overview" className="space-y-6">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {statsLoading ? (
+                  <>
+                    <Skeleton className="h-32" />
+                    <Skeleton className="h-32" />
+                    <Skeleton className="h-32" />
+                    <Skeleton className="h-32" />
+                  </>
+                ) : (
+                  <>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Total Users
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">{stats?.total_users || 0}</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {stats?.active_users || 0} active users
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Assessments
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">{stats?.total_assessments || 0}</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Total completed
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Career Recommendations
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">
+                          {stats?.total_career_recommendations || 0}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Generated by AI
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Chatbot Queries
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">
+                          {stats?.total_chatbot_queries || 0}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Total interactions
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-muted-foreground" />
-                  <div className="text-sm font-medium text-muted-foreground">Active Users</div>
-                </div>
-                <div className="text-2xl font-bold">{overviewMetrics.active_users}</div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Award className="h-4 w-4 text-muted-foreground" />
-                  <div className="text-sm font-medium text-muted-foreground">Assessments</div>
-                </div>
-                <div className="text-2xl font-bold">{overviewMetrics.total_assessments}</div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Target className="h-4 w-4 text-muted-foreground" />
-                  <div className="text-sm font-medium text-muted-foreground">Career Recs</div>
-                </div>
-                <div className="text-2xl font-bold">{overviewMetrics.total_career_recommendations}</div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                  <div className="text-sm font-medium text-muted-foreground">Chat Queries</div>
-                </div>
-                <div className="text-2xl font-bold">{overviewMetrics.total_chatbot_queries}</div>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
 
-      {/* System Metrics Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>System Metrics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {metricsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-16" />
+              {/* Quick Actions */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Quick Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setActiveTab('users')}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Manage Users
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setActiveTab('quiz')}
+                    >
+                      <HelpCircle className="h-4 w-4 mr-2" />
+                      Manage Quiz Questions
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setActiveTab('monitoring')}
+                    >
+                      <Activity className="h-4 w-4 mr-2" />
+                      View System Status
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setActiveTab('logs')}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Check Logs
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>System Health</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Database</span>
+                        <Badge variant="default" className="bg-green-500">Connected</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">API Services</span>
+                        <Badge variant="default" className="bg-green-500">Running</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">AI/LLM Service</span>
+                        <Badge variant="default" className="bg-green-500">Available</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Vector Store</span>
+                        <Badge variant="outline">Not Configured</Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Users Tab */}
+            <TabsContent value="users">
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <Button onClick={handleCreateUser}>
+                    <Users className="h-4 w-4 mr-2" />
+                    Create New User
+                  </Button>
                 </div>
-              ))}
-            </div>
-          ) : metricsError ? (
-            <Alert variant="destructive">
-              <AlertDescription>{metricsError}</AlertDescription>
-            </Alert>
-          ) : metricsData ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-muted-foreground">CPU Usage</div>
-                <div className="text-2xl font-bold">{metricsData.system.cpu_percent.toFixed(1)}%</div>
+                <UserManagementTable 
+                  onViewUser={handleViewUser}
+                  onEditUser={handleEditUser}
+                />
               </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-muted-foreground">Memory Usage</div>
-                <div className="text-2xl font-bold">{metricsData.system.memory_percent.toFixed(1)}%</div>
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-muted-foreground">Disk Usage</div>
-                <div className="text-2xl font-bold">{metricsData.system.disk_usage_percent.toFixed(1)}%</div>
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-muted-foreground">Uptime</div>
-                <div className="text-2xl font-bold">{formatUptime(metricsData.system.uptime_seconds)}</div>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+            </TabsContent>
 
-      {/* User Management Section */}
-      <Tabs defaultValue="users" className="w-full">
-        <TabsList>
-          <TabsTrigger value="users">User Management</TabsTrigger>
-        </TabsList>
-        <TabsContent value="users" className="mt-6">
-          <UserManagementTable
-            onViewUser={(userId) => {
-              setSelectedUserId(userId);
-              setShowUserDetails(true);
-            }}
-            onEditUser={(userId) => {
-              setSelectedUserId(userId);
-              setShowCareerEditor(true);
-            }}
-          />
-        </TabsContent>
-      </Tabs>
 
-      {/* Modals */}
-      <UserDetailsModal
+            {/* Quiz Tab */}
+            <TabsContent value="quiz">
+              <QuizManager />
+            </TabsContent>
+
+            {/* Monitoring Tab */}
+            <TabsContent value="monitoring">
+              <SystemMonitor />
+            </TabsContent>
+
+            {/* Logs Tab */}
+            <TabsContent value="logs">
+              <LogViewer />
+            </TabsContent>
+
+            {/* Analytics Tab */}
+            <TabsContent value="analytics">
+              <CareerAnalytics />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </main>
+
+      {/* User Details Modal */}
+      {selectedUserId && (
+        <UserDetailsModal
+          userId={selectedUserId}
+          isOpen={isUserModalOpen}
+          onClose={handleCloseUserModal}
+          onEditCareer={(userId) => {
+            // Handle career edit
+            console.log('Edit career for user:', userId);
+          }}
+        />
+      )}
+
+
+      {/* User Form Modal (Create/Edit) */}
+      <UserForm
         userId={selectedUserId}
-        isOpen={showUserDetails}
-        onClose={() => {
-          setShowUserDetails(false);
-          setSelectedUserId(null);
-        }}
-        onEditCareer={(userId) => {
-          setShowUserDetails(false);
-          setSelectedUserId(userId);
-          setShowCareerEditor(true);
-        }}
-      />
-
-      <CareerRecommendationEditor
-        userId={selectedUserId}
-        isOpen={showCareerEditor}
-        onClose={() => {
-          setShowCareerEditor(false);
-          setSelectedUserId(null);
-        }}
-        onSave={() => {
-          // Refresh data if needed
-          fetchOverviewMetrics();
-        }}
+        isOpen={isUserFormOpen}
+        onClose={handleCloseUserForm}
+        onSuccess={handleUserFormSuccess}
+        isEditMode={isEditMode}
       />
     </div>
+
   );
-};
+}

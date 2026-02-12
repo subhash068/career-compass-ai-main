@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import Login from '@/pages/Login';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -8,8 +7,11 @@ interface AuthWrapperProps {
 
 export function AuthWrapper({ children }: AuthWrapperProps) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const justLoggedIn = useRef(false);
+
   const navigate = useNavigate();
   const location = useLocation();
+
 
   const checkAuth = () => {
     const token = localStorage.getItem('authToken');
@@ -35,6 +37,12 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     // Listen for custom auth events
     const handleAuthChange = () => {
       checkAuth();
+      // Mark that user just logged in to prevent AuthWrapper from overriding redirect
+      justLoggedIn.current = true;
+      // Reset the flag after a short delay
+      setTimeout(() => {
+        justLoggedIn.current = false;
+      }, 500);
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -46,23 +54,36 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     };
   }, []);
 
+
   // Handle redirection in useEffect to avoid calling navigate during render
   useEffect(() => {
     if (isAuthenticated) {
+      // Skip redirect if user just logged in (let Login.tsx handle the redirect)
+      if (justLoggedIn.current) {
+        console.log('AuthWrapper: Skipping redirect because user just logged in');
+        return;
+      }
+
       const userStr = localStorage.getItem('user');
       if (userStr && userStr !== 'undefined') {
         try {
           const user = JSON.parse(userStr);
-          if (user && user.role && typeof user.role === 'string') {
-            if (user.role.toUpperCase() === 'ADMIN') {
-              if (location.pathname !== '/admin') {
+          // Only redirect from root path, don't force admin to /admin
+          // Let users stay on their current page
+          if (location.pathname === '/') {
+            if (user && user.role && typeof user.role === 'string') {
+              // Case-insensitive role check
+              const userRole = user.role.toUpperCase();
+              if (userRole === 'admin') {
+                console.log('AuthWrapper: Redirecting admin from / to /admin');
                 navigate('/admin');
+              } else {
+                console.log('AuthWrapper: Redirecting user from / to /dashboard');
+                navigate('/dashboard');
               }
-            } else if (location.pathname === '/') {
+            } else {
               navigate('/dashboard');
             }
-          } else if (location.pathname === '/') {
-            navigate('/dashboard');
           }
         } catch (error) {
           console.error('Error parsing user data:', error);
@@ -77,6 +98,8 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     }
   }, [isAuthenticated, location.pathname, navigate]);
 
+
+
   // Show loading while checking authentication
   if (isAuthenticated === null) {
     return (
@@ -86,10 +109,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     );
   }
 
-  // If not authenticated, show login
-  if (!isAuthenticated) {
-    return <Login />;
-  }
-
+  // Always render children - let individual routes handle their own auth
   return <>{children}</>;
+
 }

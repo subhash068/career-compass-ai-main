@@ -316,3 +316,178 @@ class AdminService:
         db.commit()
 
         return {"message": "Requirement removed"}
+
+    # --------------------------------------------------
+    # USER MANAGEMENT
+    # --------------------------------------------------
+    @staticmethod
+    def get_users(
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        """
+        Get all users with pagination
+        """
+        users = db.query(User).offset(skip).limit(limit).all()
+        total = db.query(User).count()
+        
+        return {
+            "users": [
+                {
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.name,
+                    "role": user.role,
+                    "currentRole": getattr(user, 'currentRole', None),
+                    "created_at": getattr(user, 'created_at', None),
+                    "updated_at": getattr(user, 'updated_at', None),
+                }
+                for user in users
+            ],
+            "total": total,
+            "page": (skip // limit) + 1,
+            "limit": limit
+        }
+
+    @staticmethod
+    def get_user_details(
+        db: Session,
+        user_id: int,
+    ) -> Dict[str, Any]:
+        """
+        Get detailed information about a specific user
+        """
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise ValueError("User not found")
+
+        # Get user's skills
+        from models.user_skill import UserSkill
+        user_skills = db.query(UserSkill).filter(UserSkill.user_id == user_id).all()
+        
+        # Get user's assessments
+        from models.skill_assessment import SkillAssessment
+        assessments = db.query(SkillAssessment).filter(SkillAssessment.user_id == user_id).all()
+
+        return {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "currentRole": getattr(user, 'currentRole', None),
+            "created_at": getattr(user, 'created_at', None),
+            "updated_at": getattr(user, 'updated_at', None),
+            "skills": [
+                {
+                    "name": skill.skill.name if hasattr(skill, 'skill') else f"Skill {skill.skill_id}",
+                    "level": skill.inferred_level,
+                    "confidence": skill.confidence
+                }
+                for skill in user_skills
+            ],
+            "assessments": [
+                {
+                    "id": assessment.id,
+                    "status": assessment.status,
+                    "completed_at": assessment.completed_at,
+                    "skills": []  # Would need to fetch assessment skills
+                }
+                for assessment in assessments
+            ],
+            "careerRecommendations": [],  # Placeholder
+            "learningPath": None  # Placeholder
+        }
+
+    @staticmethod
+    def update_user_role(
+        db: Session,
+        user_id: int,
+        new_role: str,
+    ) -> Dict[str, Any]:
+        """
+        Update a user's role
+        """
+        if new_role not in ["user", "admin"]:
+            raise ValueError("Invalid role. Must be 'user' or 'admin'")
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise ValueError("User not found")
+
+        user.role = new_role
+        db.commit()
+        db.refresh(user)
+
+        return {
+            "message": "User role updated successfully",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "role": user.role
+            }
+        }
+
+    # --------------------------------------------------
+    # ASSESSMENTS
+    # --------------------------------------------------
+    @staticmethod
+    def get_assessments(
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        """
+        Get all skill assessments with pagination
+        """
+        from models.skill_assessment import SkillAssessment
+        
+        assessments = db.query(SkillAssessment).offset(skip).limit(limit).all()
+        total = db.query(SkillAssessment).count()
+
+        return {
+            "assessments": [
+                {
+                    "id": assessment.id,
+                    "user_id": assessment.user_id,
+                    "user_name": assessment.user.name if hasattr(assessment, 'user') and assessment.user else "Unknown",
+                    "user_email": assessment.user.email if hasattr(assessment, 'user') and assessment.user else "Unknown",
+                    "skill_name": assessment.skill.name if hasattr(assessment, 'skill') and assessment.skill else "Unknown",
+                    "score": getattr(assessment, 'score', 0),
+                    "status": assessment.status,
+                    "completed_at": assessment.completed_at,
+                }
+                for assessment in assessments
+            ],
+            "total": total,
+            "page": (skip // limit) + 1,
+            "limit": limit
+        }
+
+    # --------------------------------------------------
+    # SYSTEM STATS
+    # --------------------------------------------------
+    @staticmethod
+    def get_stats(db: Session) -> Dict[str, Any]:
+        """
+        Get system statistics
+        """
+        total_users = db.query(User).count()
+        total_skills = db.query(Skill).count()
+        total_roles = db.query(JobRole).count()
+        
+        from models.skill_assessment import SkillAssessment
+        total_assessments = db.query(SkillAssessment).count()
+        completed_assessments = db.query(SkillAssessment).filter(
+            SkillAssessment.status == "completed"
+        ).count()
+
+        return {
+            "total_users": total_users,
+            "total_skills": total_skills,
+            "total_roles": total_roles,
+            "total_assessments": total_assessments,
+            "completed_assessments": completed_assessments,
+            "system_health": "healthy"
+        }
