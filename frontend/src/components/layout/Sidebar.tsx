@@ -21,7 +21,7 @@ import { Profile } from '@/components/Profile';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/assessment', icon: Target, label: 'Skill Assessment' },
+  { to: '/skill_selection', icon: Target, label: 'Skill Assessment' },
   { to: '/gaps', icon: TrendingUp, label: 'Gap Analysis' },
   { to: '/careers', icon: Briefcase, label: 'Career Matches' },
   { to: '/learning', icon: GraduationCap, label: 'Learning Path' },

@@ -16,7 +16,7 @@ import { PageLoader } from "@/components/ui/skeleton-loader";
 // Lazy load all pages for code splitting
 const Dashboard = React.lazy(() => import("@/pages/Dashboard"));
 const SkillSelection = React.lazy(() => import("@/pages/SkillSelection"));
-const Assessment = React.lazy(() => import("@/pages/Assessment"));
+const Assessment = React.lazy(() => import("@/pages/AssessmentLanding"));
 const Results = React.lazy(() => import("@/pages/Results"));
 const GapAnalysis = React.lazy(() => import("@/pages/GapAnalysis"));
 const Careers = React.lazy(() => import("@/pages/Careers"));
@@ -66,7 +66,7 @@ const App = () => (
                         <Route path="/skill_selection" element={<SkillSelection />} />
                         <Route path="/skill_selection/assessment/exam" element={<SkillExam />} />
                         <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/assessment" element={<Assessment />} />
+                        <Route path="/skill_selection/assessment" element={<Assessment />} />
                         <Route path="/results" element={<Results />} />
                         <Route path="/gaps" element={<GapAnalysis />} />
                         <Route path="/careers" element={<Careers />} />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { skillsApi } from '@/api/skills.api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/auth/AuthContext';
+
 
 interface Question {
   id: number;
@@ -21,11 +23,18 @@ export default function SkillExam() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
 
-  // Get skill data from navigation state
-  const skillName = location.state?.skillName || 'Unknown Skill';
-  const initialSkillId = location.state?.skillId || null;
+  // Get skill data from navigation state or URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlSkillId = urlParams.get('skillId');
+  const urlSkillName = urlParams.get('skillName');
+  
+  // Try to get from navigation state first, then URL params, then localStorage
+  const skillName = location.state?.skillName || urlSkillName || localStorage.getItem('currentSkillName') || 'Unknown Skill';
+  const initialSkillId = location.state?.skillId || (urlSkillId ? parseInt(urlSkillId) : null) || (localStorage.getItem('currentSkillId') ? parseInt(localStorage.getItem('currentSkillId')!) : null);
+
+
 
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -38,6 +47,15 @@ export default function SkillExam() {
   const [skillId, setSkillId] = useState<number | null>(initialSkillId);
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
 
+  // Store skill info in localStorage when available
+  useEffect(() => {
+    if (skillId && skillName && skillName !== 'Unknown Skill') {
+      localStorage.setItem('currentSkillId', skillId.toString());
+      localStorage.setItem('currentSkillName', skillName);
+    }
+  }, [skillId, skillName]);
+
+
   // Format time
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -48,6 +66,11 @@ export default function SkillExam() {
   useEffect(() => {
     const loadExam = async () => {
       try {
+        // Wait for auth to finish loading before checking user
+        if (isAuthLoading) {
+          return;
+        }
+
         if (!user) {
           toast({
             title: "Authentication required",
@@ -58,42 +81,39 @@ export default function SkillExam() {
           return;
         }
 
-        // Use skillId from state if available, otherwise look it up
+
+        // Use skillId from state, URL params, or localStorage
         let currentSkillId = initialSkillId;
-        
+
         if (!currentSkillId) {
-          // Get all skills and find the one matching the skill name
-          const allSkills = await skillsApi.getAllSkills();
-          const skill = allSkills.find(s => 
-            s.name.toLowerCase() === skillName?.toLowerCase()
-          );
+          toast({
+            title: "Skill not found",
+            description: "No skill ID provided. Please select a skill from the skill selection page.",
+            variant: "destructive",
+          });
+          navigate('/skill_selection');
+          return;
+        }
 
-          if (!skill) {
-            toast({
-              title: "Skill not found",
-              description: `Could not find skill: ${skillName}`,
-              variant: "destructive",
-            });
-            navigate('/skill_selection');
-            return;
+        setSkillId(currentSkillId);
+
+
+        // Load quiz from new API
+        const response = await fetch(`http://localhost:5000/api/assessment/start/${currentSkillId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+
           }
+        });
 
-          currentSkillId = skill.id;
-          setSkillId(skill.id);
+        if (!response.ok) {
+          throw new Error('Failed to load quiz');
         }
 
-        // Get 10 questions for this skill
-        const quizData = await skillsApi.getQuizQuestions([currentSkillId]);
-        
-        if (quizData.questions && quizData.questions[currentSkillId]) {
-          const skillQuestions = quizData.questions[currentSkillId].questions;
-          // Shuffle and take 10 questions
-          const shuffled = [...skillQuestions].sort(() => Math.random() - 0.5);
-          setQuestions(shuffled.slice(0, 10));
-        } else {
-          // Generate mock questions if no questions available
-          setQuestions(generateMockQuestions(skillName));
-        }
+        const data = await response.json();
+
+        setQuestions(data.questions);
+        setTimeLeft(data.time_limit);
       } catch (error) {
         console.error('Error loading exam:', error);
         toast({
@@ -107,22 +127,23 @@ export default function SkillExam() {
     };
 
     loadExam();
-  }, [skillName, user, navigate, toast, initialSkillId]);
+  }, [skillName, user, isAuthLoading, navigate, toast, initialSkillId]);
 
-  const generateMockQuestions = (skillName: string): Question[] => {
-    return Array.from({ length: 10 }, (_, i) => ({
-      id: i + 1,
-      question_text: `Question ${i + 1}: What is your understanding of ${skillName} concept ${i + 1}?`,
-      options: [
-        `Basic understanding of ${skillName}`,
-        `Intermediate knowledge with some practical experience`,
-        `Advanced expertise with multiple projects`,
-        `Expert level with deep architectural knowledge`
-      ],
-      correct_answer: `Advanced expertise with multiple projects`,
-      difficulty: i < 3 ? 'easy' : i < 7 ? 'medium' : 'hard'
-    }));
-  };
+
+  // const generateMockQuestions = (skillName: string): Question[] => {
+  //   return Array.from({ length: 10 }, (_, i) => ({
+  //     id: i + 1,
+  //     question_text: `Question ${i + 1}: What is your understanding of ${skillName} concept ${i + 1}?`,
+  //     options: [
+  //       `Basic understanding of ${skillName}`,
+  //       `Intermediate knowledge with some practical experience`,
+  //       `Advanced expertise with multiple projects`,
+  //       `Expert level with deep architectural knowledge`
+  //     ],
+  //     correct_answer: `Advanced expertise with multiple projects`,
+  //     difficulty: i < 3 ? 'easy' : i < 7 ? 'medium' : 'hard'
+  //   }));
+  // };
 
   const handleAnswer = (questionId: number, answer: string) => {
     setAnswers(prev => ({
@@ -161,9 +182,44 @@ export default function SkillExam() {
   }, [examComplete, timeLeft]);
 
   const submitExam = async () => {
+    // Validate skillId before submission
+    if (!skillId) {
+      toast({
+        title: "Error",
+        description: "Cannot submit exam: Skill ID is missing. Please restart the exam.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // Calculate score
+      // Submit to backend first if skillId exists
+      let backendResult = null;
+
+      try {
+        // Format answers as expected by backend: Record<question_id, answer>
+        const formattedAnswers: Record<number, string> = {};
+        Object.entries(answers).forEach(([questionId, answer]) => {
+          formattedAnswers[parseInt(questionId)] = answer;
+        });
+
+        const response = await skillsApi.submitQuiz({
+          skill_id: skillId,
+          answers: formattedAnswers,
+          time_taken: 600 - timeLeft
+        });
+
+        // Use backend response if available
+        if (response.data && response.data.skill_results && response.data.skill_results.length > 0) {
+          backendResult = response.data.skill_results[0];
+        }
+      } catch (e) {
+        console.log('Backend submission failed, using local calculation:', e);
+      }
+
+      // Calculate score locally as fallback
+
       let correctCount = 0;
       questions.forEach(q => {
         if (answers[q.id] === q.correct_answer) {
@@ -171,19 +227,24 @@ export default function SkillExam() {
         }
       });
 
-      const score = (correctCount / questions.length) * 100;
+      const localScore = (correctCount / questions.length) * 100;
 
-      // Determine level
+      // Use backend result if available, otherwise use local calculation
+      const score = backendResult ? backendResult.percentage : localScore;
+      const finalCorrectCount = backendResult ? backendResult.correct_answers : correctCount;
+      
+      // Determine level based on score
       let level = 'Beginner';
       if (score >= 80) level = 'Expert';
       else if (score >= 60) level = 'Advanced';
       else if (score >= 40) level = 'Intermediate';
 
       const result = {
+        skill_id: skillId, // Include skill_id for reference
         skill_name: skillName,
-        score,
+        score: score,
         level,
-        correct_answers: correctCount,
+        correct_answers: finalCorrectCount,
         total_questions: questions.length,
         written_assessment: writtenAnswer,
         time_taken: 600 - timeLeft
@@ -192,26 +253,15 @@ export default function SkillExam() {
       setResults(result);
       setExamComplete(true);
 
+      // Clear localStorage after successful submission
+      localStorage.removeItem('currentSkillId');
+      localStorage.removeItem('currentSkillName');
+
       toast({
         title: "Exam Completed!",
         description: `You scored ${score.toFixed(1)}% - ${level} level`,
       });
 
-      // Submit to backend if skillId exists
-      if (skillId) {
-        try {
-          await skillsApi.submitQuiz({
-            answers: {
-              [skillId]: Object.entries(answers).map(([questionId, answer]) => ({
-                question_id: parseInt(questionId),
-                answer
-              }))
-            }
-          });
-        } catch (e) {
-          console.log('Backend submission optional:', e);
-        }
-      }
     } catch (error) {
       console.error('Error submitting exam:', error);
       toast({
@@ -224,19 +274,21 @@ export default function SkillExam() {
     }
   };
 
+
   const handleSubmit = () => {
     submitExam();
   };
 
   const allAnswered = questions.length > 0 && questions.every(q => answers[q.id]);
 
-  if (loading) {
+  if (loading || isAuthLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
   }
+
 
   if (examComplete && results) {
     return (
@@ -246,7 +298,7 @@ export default function SkillExam() {
             <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
-            <CardTitle className="text-2xl">Exam Completed!</CardTitle>
+            <CardTitle className="text-2xl">Exam Completed !</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="text-center">
@@ -277,9 +329,9 @@ export default function SkillExam() {
             )}
 
             <div className="flex justify-center gap-4">
-              <Button onClick={() => navigate('/skill_selection')} variant="outline">
+              <Button onClick={() => navigate('/skill_selection/assessment')} variant="outline">
                 <ChevronLeft className="w-4 h-4 mr-2" />
-                Back to Skills
+                Back to Assessments
               </Button>
               <Button onClick={() => navigate('/dashboard')}>
                 Go to Dashboard
@@ -294,15 +346,15 @@ export default function SkillExam() {
   const currentQ = questions[currentQuestion];
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+    <div className="space-y-2 animate-fade-in max-w-xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => navigate('/skill_selection')}>
-          <ChevronLeft className="w-4 h-4 mr-2" />
+          <ChevronLeft className="w-3 h-3 mr-2" />
           Back
         </Button>
         <div className="flex items-center gap-2 text-muted-foreground">
-          <Timer className="w-4 h-4" />
+          <Timer className="w-3 h-3" />
           <span className={timeLeft < 60 ? 'text-red-500 font-bold' : ''}>
             {formatTime(timeLeft)}
           </span>
@@ -327,7 +379,7 @@ export default function SkillExam() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
+            <CardTitle className="text-xl">
               {skillName} Assessment
             </CardTitle>
             <span className={cn(
@@ -340,7 +392,7 @@ export default function SkillExam() {
             </span>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <h3 className="text-lg font-medium">
             {currentQ?.question_text}
           </h3>
@@ -350,7 +402,7 @@ export default function SkillExam() {
               <label
                 key={index}
                 className={cn(
-                  "flex items-center space-x-3 p-4 rounded-lg border cursor-pointer transition-colors",
+                  "flex items-center space-x-3 p-5 rounded-lg border cursor-pointer transition-colors",
                   answers[currentQ.id] === option
                     ? "border-primary bg-primary/5"
                     : "border-border hover:border-primary/50"

@@ -90,19 +90,24 @@ def analyze_skills(
             db=db,
             user_id=current_user.id,
         )
-        
+
         # Transform to match frontend SkillAnalysisResponse format
         # The frontend expects: { skills: [], gaps: [], recommendations: [] }
         return {
             "skills": result.get("skills", []),
-            "gaps": result.get("skill_breakdown", {}).get("gaps", []),
-            "recommendations": result.get("insights", {}).get("recommendations", [])
+            "gaps": result.get("gaps", []),
+            "recommendations": result.get("recommendations", [])
         }
     except Exception as e:
         import traceback
         print(f"Error in analyze_skills route: {e}")
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        # Return fallback response instead of error
+        return {
+            "skills": [],
+            "gaps": [],
+            "recommendations": []
+        }
 
 
 @router.get("/{domain_id}")
@@ -483,7 +488,7 @@ def get_all_skills(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/assessment")
+@router.get("/skill_selection/assessment")
 def get_assessment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

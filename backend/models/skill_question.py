@@ -1,5 +1,5 @@
 from .database import Base
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, text
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, text, Index
 from sqlalchemy.orm import relationship
 import json
 
@@ -31,6 +31,9 @@ class SkillQuestion(Base):
         server_default=text("'medium'"),
     )
 
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    updated_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
+
     # Relationships
     skill = relationship("Skill", back_populates="questions")
 
@@ -44,6 +47,11 @@ class SkillQuestion(Base):
         "AssessmentAnswer",
         back_populates="question",
         cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index('idx_skill_question_skill_id', 'skill_id'),
+        Index('idx_skill_question_difficulty', 'difficulty'),
     )
 
     # -----------------

@@ -83,7 +83,10 @@ class Skill(Base):
     # Helper methods
     # -------------------------
     def get_depends_on(self):
-        return json.loads(self.depends_on) if self.depends_on else []
+        try:
+            return json.loads(self.depends_on) if self.depends_on else []
+        except json.JSONDecodeError:
+            return []
 
     def set_depends_on(self, depends_on_list):
         self.depends_on = json.dumps(depends_on_list)

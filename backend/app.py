@@ -29,6 +29,7 @@ from models.user_skill import UserSkill
 # Routers
 from routes import auth_fastapi as auth
 from routes.skills import router as skills_router
+from routes.assessment import router as assessment_router
 from routes.domains import router as domains_router
 from routes.career import router as career_router
 from routes.learning import router as learning_router
@@ -73,6 +74,7 @@ app.add_middleware(
 # -----------------------------
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(skills_router, prefix="/skills", tags=["Skills"])
+app.include_router(assessment_router, tags=["Assessment"])
 
 app.include_router(domains_router, prefix="/api", tags=["Domains"])
 app.include_router(career_router, tags=["Career"])

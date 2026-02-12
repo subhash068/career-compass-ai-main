@@ -41,6 +41,9 @@ class UserSkill(Base):
         server_default=text("1")
     )
 
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    updated_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
+
     user = relationship("User", back_populates="skills")
     skill = relationship("Skill", back_populates="user_skills")
 

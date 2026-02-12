@@ -148,7 +148,7 @@ export default function SkillSelection() {
     });
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (selectedSkills.size === 0) {
       toast({
         title: "No skills selected",
@@ -158,11 +158,45 @@ export default function SkillSelection() {
       return;
     }
 
-    // Store selected skills and domain for the assessment page
-    sessionStorage.setItem('selectedSkills', JSON.stringify(Array.from(selectedSkills)));
-    sessionStorage.setItem('selectedDomain', selectedDomain!.toString());
+    try {
+      setLoading(true);
 
-    navigate('/assessment');
+      // Initialize assessment with backend
+      const response = await fetch('http://localhost:5000/api/assessment/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+
+        },
+        body: JSON.stringify({
+          domain_id: selectedDomain,
+          skill_ids: Array.from(selectedSkills)
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to initialize assessment');
+      }
+
+      const data = await response.json();
+
+      // Store assessment data
+      sessionStorage.setItem('assessmentId', data.assessment_id.toString());
+      sessionStorage.setItem('selectedSkills', JSON.stringify(data.skills));
+
+      navigate('/skill_selection/assessment');
+
+    } catch (error) {
+      console.error('Error initializing assessment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to initialize assessment. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -92,7 +92,7 @@ export default function Dashboard() {
         </div>
         <div className="flex gap-3">
           <Button variant="outline" asChild>
-            <Link to="/assessment">
+            <Link to="/skill_selection">
               <Target className="w-4 h-4 mr-2" />
               Take Assessment
             </Link>

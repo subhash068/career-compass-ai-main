@@ -232,17 +232,43 @@ class SkillsService:
                 "user_id": user_id,
                 "message": "No skills found for analysis",
                 "insights": {},
+                "skills": [],
+                "gaps": [],
+                "recommendations": []
             }
 
-        # Apply AI enhancements
-        enhanced_skills = SkillsService._apply_ai_enhancements(db, user_skills)
+        # Apply AI enhancements (with fallback)
+        enhanced_skills = []
+        try:
+            enhanced_skills = SkillsService._apply_ai_enhancements(db, user_skills)
+        except Exception as e:
+            print(f"AI enhancement failed, using basic skills: {e}")
+            enhanced_skills = user_skills
 
-        # Detect hidden/inferred skills
-        hidden_skills_result = SkillInference.detect_hidden_skills(db, user_id)
-        inferred_skills = hidden_skills_result.get("inferred_skills", [])
+        # Detect hidden/inferred skills (with fallback)
+        inferred_skills = []
+        try:
+            hidden_skills_result = SkillInference.detect_hidden_skills(db, user_id)
+            inferred_skills = hidden_skills_result.get("inferred_skills", [])
+        except Exception as e:
+            print(f"Hidden skills detection failed: {e}")
+            inferred_skills = []
 
         # Generate insights
         insights = SkillsService._generate_skill_insights(enhanced_skills, inferred_skills)
+
+        # Format skills for frontend
+        skills_data = []
+        for user_skill in enhanced_skills:
+            skills_data.append({
+                "skill_id": user_skill.skill_id,
+                "skill_name": user_skill.skill.name,
+                "category": user_skill.skill.category,
+                "score": user_skill.score,
+                "confidence": user_skill.confidence,
+                "level": user_skill.level,
+                "assessed_at": user_skill.assessed_at.isoformat() if user_skill.assessed_at else None,
+            })
 
         return {
             "user_id": user_id,
@@ -253,6 +279,9 @@ class SkillsService:
                 "strengths": insights["strengths"],
                 "gaps": insights["gaps"],
             },
+            "skills": skills_data,
+            "gaps": insights["gaps"],
+            "recommendations": insights["recommendations"]
         }
 
     # -----------------------------------------------------

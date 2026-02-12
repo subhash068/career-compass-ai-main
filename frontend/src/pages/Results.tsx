@@ -78,10 +78,98 @@ export default function Results() {
   useEffect(() => {
     const loadResults = async () => {
       try {
-        // For now, we'll get results from the last assessment
-        // In a real app, you'd get the assessment ID from the URL or state
-        const resultsData = await skillsApi.getAssessmentResults();
-        setResults(resultsData);
+        // Get assessment ID from session storage
+        const assessmentId = sessionStorage.getItem('assessmentId');
+        if (!assessmentId) {
+          toast({
+            title: "No assessment found",
+            description: "Please complete an assessment first.",
+            variant: "destructive",
+          });
+          navigate('/skill_selection');
+          return;
+        }
+
+        // Get selected skills to show results for each
+        const selectedSkillsData = sessionStorage.getItem('selectedSkills');
+        if (!selectedSkillsData) {
+          toast({
+            title: "No skills found",
+            description: "Please select skills first.",
+            variant: "destructive",
+          });
+          navigate('/skill_selection');
+          return;
+        }
+
+        const selectedSkills = JSON.parse(selectedSkillsData);
+
+        // Get results for each skill
+        const skillResults: Record<string, SkillResult> = {};
+        let totalScore = 0;
+        let totalQuestions = 0;
+        let totalCorrect = 0;
+
+        for (const skill of selectedSkills) {
+          try {
+            const response = await fetch(`http://localhost:5000/api/assessment/result/${skill.id}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+
+              }
+            });
+
+            if (response.ok) {
+              const skillResult = await response.json();
+              skillResults[skill.name] = {
+                score: skillResult.score,
+                percentage: skillResult.percentage,
+                level: skillResult.level,
+                gap: skillResult.confidence < 50 ? 'High' : skillResult.confidence < 70 ? 'Medium' : 'Low',
+                correct_answers: Math.round((skillResult.percentage / 100) * 10), // Assuming 10 questions
+                total_questions: 10
+              };
+
+              totalScore += skillResult.percentage;
+              totalCorrect += Math.round((skillResult.percentage / 100) * 10);
+              totalQuestions += 10;
+            }
+          } catch (e) {
+            console.log(`Could not get result for ${skill.name}:`, e);
+          }
+        }
+
+        const overallScore = totalQuestions > 0 ? (totalScore / selectedSkills.length) : 0;
+
+        // Generate recommendations based on results
+        const weakSkills = Object.entries(skillResults)
+          .filter(([_, result]) => result.gap === 'High')
+          .map(([name, _]) => name);
+
+        const strongSkills = Object.entries(skillResults)
+          .filter(([_, result]) => result.gap === 'Low')
+          .map(([name, _]) => name);
+
+        const recommendations = weakSkills.map(skill =>
+          `Focus on improving ${skill} through targeted practice and learning resources.`
+        );
+
+        const learningPath = [
+          "Review weak areas with additional practice questions",
+          "Complete targeted learning modules for identified gaps",
+          "Apply skills in practical projects",
+          "Retake assessment to track improvement"
+        ];
+
+        setResults({
+          overall_score: overallScore,
+          skill_scores: skillResults,
+          recommendations,
+          strong_skills: strongSkills,
+          weak_skills: weakSkills,
+          learning_path: learningPath
+        });
+
       } catch (error) {
         console.error('Error loading results:', error);
         toast({
@@ -95,7 +183,7 @@ export default function Results() {
     };
 
     loadResults();
-  }, [toast]);
+  }, [toast, navigate]);
 
   if (loading) {
     return (

@@ -31,63 +31,91 @@ class CareerScoring:
         - Growth rate from history (10%)
         - Learning speed estimation (10%)
         """
-        user_skills = db.query(UserSkill).filter(
-            UserSkill.user_id == user_id
-        ).all()
-        user_skill_map = {us.skill_id: us for us in user_skills}
+        try:
+            user_skills = db.query(UserSkill).filter(
+                UserSkill.user_id == user_id
+            ).all()
+            user_skill_map = {us.skill_id: us for us in user_skills}
 
-        # Calculate skill match percentage
-        skill_match_pct = CareerScoring._calculate_skill_match(
-            user_skill_map, role_requirements
-        )
+            # Calculate skill match percentage
+            skill_match_pct = CareerScoring._calculate_skill_match(
+                user_skill_map, role_requirements
+            )
 
-        # Enhanced factors using Phase 3A capabilities
-        inferred_skills_bonus = CareerScoring._calculate_inferred_skills_bonus(
-            db, user_id, role_requirements
-        )
+            # Enhanced factors using Phase 3A capabilities (with error handling)
+            try:
+                inferred_skills_bonus = CareerScoring._calculate_inferred_skills_bonus(
+                    db, user_id, role_requirements
+                )
+            except Exception as e:
+                print(f"Inferred skills bonus calculation failed: {e}")
+                inferred_skills_bonus = 0.0
 
-        skill_trend = CareerScoring._calculate_skill_trend(conversation_memory)
-        growth_rate = CareerScoring._calculate_growth_rate(conversation_memory)
-        learning_speed = CareerScoring._estimate_learning_speed(user_skills, conversation_memory)
+            skill_trend = CareerScoring._calculate_skill_trend(conversation_memory)
+            growth_rate = CareerScoring._calculate_growth_rate(conversation_memory)
+            learning_speed = CareerScoring._estimate_learning_speed(user_skills, conversation_memory)
 
-        # Weighted final score with enhanced factors
-        final_score = (
-            skill_match_pct * 0.5 +
-            inferred_skills_bonus * 0.15 +
-            skill_trend * 0.15 +
-            growth_rate * 0.1 +
-            learning_speed * 0.1
-        )
+            # Weighted final score with enhanced factors
+            final_score = (
+                skill_match_pct * 0.5 +
+                inferred_skills_bonus * 0.15 +
+                skill_trend * 0.15 +
+                growth_rate * 0.1 +
+                learning_speed * 0.1
+            )
 
-        # Classify missing skill severity with inference
-        missing_severity = CareerScoring._classify_missing_skills(
-            user_skill_map, role_requirements, db, user_id
-        )
+            # Classify missing skill severity with inference
+            try:
+                missing_severity = CareerScoring._classify_missing_skills(
+                    user_skill_map, role_requirements, db, user_id
+                )
+            except Exception as e:
+                print(f"Missing skills classification failed: {e}")
+                missing_severity = []
 
-        # Explainable output with evaluation
-        explanation = CareerScoring._generate_explanation(
-            skill_match_pct, missing_severity, inferred_skills_bonus
-        )
+            # Explainable output with evaluation
+            explanation = CareerScoring._generate_explanation(
+                skill_match_pct, missing_severity, inferred_skills_bonus
+            )
 
-        # Quality evaluation
-        quality_metrics = CareerScoring._evaluate_scoring_quality(
-            final_score, skill_match_pct, inferred_skills_bonus
-        )
+            # Quality evaluation
+            quality_metrics = CareerScoring._evaluate_scoring_quality(
+                final_score, skill_match_pct, inferred_skills_bonus
+            )
 
-        return {
-            "final_score": round(final_score, 1),
-            "skill_match": skill_match_pct,
-            "inferred_bonus": inferred_skills_bonus,
-            "skill_trend": skill_trend,
-            "growth_rate": growth_rate,
-            "learning_speed": learning_speed,
-            "missing_severity": missing_severity,
-            "explanation": explanation,
-            "key_skills": CareerScoring._get_key_skills(role_requirements),
-            "improvement_priority": CareerScoring._get_improvement_priority(missing_severity),
-            "quality_metrics": quality_metrics,
-            "confidence_level": quality_metrics.get("overall_confidence", 0.5)
-        }
+            return {
+                "final_score": round(final_score, 1),
+                "skill_match": skill_match_pct,
+                "inferred_bonus": inferred_skills_bonus,
+                "skill_trend": skill_trend,
+                "growth_rate": growth_rate,
+                "learning_speed": learning_speed,
+                "missing_severity": missing_severity,
+                "explanation": explanation,
+                "key_skills": CareerScoring._get_key_skills(role_requirements),
+                "improvement_priority": CareerScoring._get_improvement_priority(missing_severity),
+                "quality_metrics": quality_metrics,
+                "confidence_level": quality_metrics.get("overall_confidence", 0.5)
+            }
+        except Exception as e:
+            print(f"Error in calculate_multi_factor_score: {e}")
+            import traceback
+            traceback.print_exc()
+            # Return fallback response
+            return {
+                "final_score": 0.0,
+                "skill_match": 0.0,
+                "inferred_bonus": 0.0,
+                "skill_trend": 0.5,
+                "growth_rate": 0.5,
+                "learning_speed": 0.5,
+                "missing_severity": [],
+                "explanation": "Unable to calculate score due to an error.",
+                "key_skills": [],
+                "improvement_priority": [],
+                "quality_metrics": {"overall_confidence": 0.0},
+                "confidence_level": 0.0
+            }
 
     @staticmethod
     def _calculate_skill_match(

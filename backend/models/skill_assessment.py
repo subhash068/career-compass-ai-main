@@ -52,6 +52,12 @@ class SkillAssessment(Base):
         cascade="all, delete-orphan",
     )
 
+    user_answers = relationship(
+        "UserAnswer",
+        back_populates="assessment",
+        cascade="all, delete-orphan",
+    )
+
     __table_args__ = (
         Index("idx_skill_assessment_user_id", "user_id"),
         Index("idx_skill_assessment_created_at", "created_at"),
@@ -146,6 +152,9 @@ class SkillAssessmentSkill(Base):
 
     written_assessment = Column(Text, nullable=True)
 
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    updated_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
+
     skill = relationship("Skill", back_populates="skill_assessment_skills")
     assessment = relationship("SkillAssessment", back_populates="assessment_skills")
 
@@ -153,3 +162,56 @@ class SkillAssessmentSkill(Base):
         Index("idx_assessment_skill_assessment_id", "assessment_id"),
         Index("idx_assessment_skill_skill_id", "skill_id"),
     )
+
+
+class UserAnswer(Base):
+    __tablename__ = "user_answers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    assessment_id = Column(
+        Integer,
+        ForeignKey("skill_assessments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    skill_id = Column(
+        Integer,
+        ForeignKey("skills.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    question_id = Column(
+        Integer,
+        ForeignKey("skill_questions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    user_answer = Column(String(500), nullable=False)
+    is_correct = Column(String(10), nullable=False, server_default=text("'false'"))
+
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+    assessment = relationship("SkillAssessment", back_populates="user_answers")
+    skill = relationship("Skill")
+    question = relationship("SkillQuestion")
+
+    __table_args__ = (
+        Index("idx_user_answer_assessment_id", "assessment_id"),
+        Index("idx_user_answer_skill_id", "skill_id"),
+        Index("idx_user_answer_question_id", "question_id"),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "assessment_id": self.assessment_id,
+            "skill_id": self.skill_id,
+            "question_id": self.question_id,
+            "user_answer": self.user_answer,
+            "is_correct": self.is_correct,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
