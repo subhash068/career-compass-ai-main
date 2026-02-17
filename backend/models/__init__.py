@@ -22,6 +22,8 @@ from .chat_session import ChatSession
 from .chat_message import ChatMessage
 from .user import User
 from .user_skill import UserSkill
+from .user_note import UserNote
+from .resume import Resume
 
 __all__ = [
     "Base",
@@ -31,6 +33,9 @@ __all__ = [
     "create_tables",
     "User",
     "UserSkill",
+    "UserNote",
+    "Resume",
+
     "Skill",
     "SkillQuestion",
     "Domain",

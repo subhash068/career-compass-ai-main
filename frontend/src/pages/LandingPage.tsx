@@ -14,11 +14,284 @@ import {
   Zap,
   Users,
   Award,
-  Rocket
+  Rocket,
+  Menu,
+  X,
+  Compass,
+  Star,
+  Hexagon
 } from 'lucide-react';
+
+// Creative Header Component
+const CreativeHeader = ({ navigate }: { navigate: (path: string) => void }) => {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const headerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (headerRef.current) {
+      const rect = headerRef.current.getBoundingClientRect();
+      setMousePos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+  };
+
+  const navItems = [
+    { name: 'Home', path: '/', icon: Compass },
+    { name: 'About', path: '/about', icon: Star },
+    { name: 'Contact', path: '#contact', icon: MessageSquare },
+  ];
+
+
+
+
+  const scrollToSection = (path: string) => {
+    if (path.startsWith('#')) {
+      const element = document.querySelector(path);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else {
+      navigate(path);
+    }
+    setIsMobileMenuOpen(false);
+  };
+
+  return (
+    <header
+      ref={headerRef}
+      onMouseMove={handleMouseMove}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${
+        isScrolled 
+          ? 'py-3' 
+          : 'py-5'
+      }`}
+    >
+      {/* Animated Background Glow */}
+      <div 
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+        style={{
+          background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(99, 102, 241, 0.15), transparent 40%)`
+        }}
+      />
+      
+      {/* Glass Morphism Container - Full Width */}
+      <div className={`transition-all duration-500 ${
+        isScrolled 
+          ? 'bg-background/80 backdrop-blur-xl shadow-2xl shadow-primary/10 border-b border-white/20' 
+          : 'bg-transparent'
+      }`}>
+
+        <div className="px-4 md:px-6 lg:px-8 py-3 flex items-center justify-between relative overflow-hidden max-w-7xl mx-auto">
+
+          
+          {/* Animated Border Gradient */}
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/20 via-secondary/20 to-accent/20 opacity-0 hover:opacity-100 transition-opacity duration-500" 
+            style={{ 
+              backgroundSize: '200% 100%',
+              animation: isScrolled ? 'shimmer 3s infinite' : 'none'
+            }} 
+          />
+
+          {/* Logo Section with Holographic Effect */}
+          <div 
+            className="flex items-center gap-3 cursor-pointer group relative"
+            onClick={() => navigate('/')}
+          >
+            {/* Holographic Background */}
+            <div className="absolute -inset-4 bg-gradient-to-r from-primary/30 via-secondary/30 to-accent/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-all duration-700 animate-pulse" />
+            
+            {/* Logo Container with 3D Effect */}
+            <div className="relative w-12 h-12 perspective-1000">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary via-secondary to-accent rounded-xl transform group-hover:rotate-y-12 group-hover:rotate-x-12 transition-transform duration-500 shadow-lg group-hover:shadow-primary/50" 
+                style={{ transformStyle: 'preserve-3d' }}
+              >
+                {/* Inner Glow */}
+                <div className="absolute inset-1 bg-background rounded-lg flex items-center justify-center overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20 animate-pulse" />
+                  <Compass className="w-6 h-6 text-primary relative z-10 group-hover:scale-110 transition-transform duration-300" />
+                </div>
+                
+                {/* Floating Particles */}
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full animate-bounce shadow-lg shadow-accent/50" />
+                <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-secondary rounded-full animate-ping" />
+              </div>
+            </div>
+
+            {/* Brand Text with Gradient Animation */}
+            <div className="hidden sm:block">
+              <span className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent animate-gradient bg-[length:200%_auto]">
+                Career Compass
+              </span>
+              <span className="block text-xs text-muted-foreground -mt-1 tracking-widest uppercase">AI Powered</span>
+            </div>
+          </div>
+
+          {/* Desktop Navigation - Beautiful Pill Design */}
+          <nav className="hidden md:flex items-center gap-2 bg-muted/40 backdrop-blur-md rounded-full px-2 py-1.5 border border-border/50 shadow-inner">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isHovered = hoveredItem === item.name;
+              const isActive = item.path === '/' ? window.location.pathname === '/' : window.location.pathname.startsWith(item.path);
+
+              
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => scrollToSection(item.path)}
+                  onMouseEnter={() => setHoveredItem(item.name)}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  className="relative px-5 py-2 rounded-full group transition-all duration-300"
+                >
+                  {/* Active Background */}
+                  <div className={`absolute inset-0 rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-300 ${
+                    isActive ? 'opacity-100' : 'opacity-0'
+                  }`} />
+                  
+                  {/* Hover Background */}
+                  <div className={`absolute inset-0 rounded-full bg-gradient-to-r from-primary/20 to-secondary/20 transition-all duration-300 ${
+                    isHovered && !isActive ? 'opacity-100' : 'opacity-0'
+                  }`} />
+                  
+                  {/* Glow Effect */}
+                  <div className={`absolute inset-0 rounded-full blur-md bg-primary/30 transition-all duration-300 ${
+                    isHovered || isActive ? 'opacity-100' : 'opacity-0'
+                  }`} />
+                  
+                  <span className={`relative flex items-center gap-2 text-sm font-medium transition-colors ${
+                    isActive ? 'text-white' : 'text-foreground/70 group-hover:text-primary'
+                  }`}>
+                    <Icon className={`w-4 h-4 transition-all duration-300 ${
+                      isHovered || isActive ? 'scale-110 rotate-6' : ''
+                    } ${isActive ? 'text-white' : ''}`} />
+                    {item.name}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+
+
+          {/* CTA Buttons - Premium Design */}
+          <div className="hidden md:flex items-center gap-3">
+            {/* Sign In - Glassmorphism */}
+            <button
+              onClick={() => navigate('/login')}
+              className="relative px-5 py-2.5 rounded-full overflow-hidden group bg-background/50 backdrop-blur-sm border border-border/60 hover:border-primary/40 transition-all duration-300"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="relative text-sm font-medium text-foreground/80 group-hover:text-primary transition-colors flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                Sign In
+              </span>
+            </button>
+
+            {/* Get Started - Premium Gradient */}
+            <button
+              onClick={() => navigate('/register')}
+              className="relative px-6 py-2.5 rounded-full overflow-hidden group shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300 hover:scale-105"
+            >
+              {/* Animated Gradient Background */}
+              <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-accent rounded-full animate-gradient bg-[length:200%_auto]" />
+              
+              {/* Shine Sweep Effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+              
+              {/* Inner Glow */}
+              <div className="absolute inset-0.5 rounded-full bg-gradient-to-r from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              
+              <span className="relative text-sm font-semibold text-white flex items-center gap-2">
+                Get Started
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform duration-300" />
+              </span>
+            </button>
+          </div>
+
+
+
+          {/* Mobile Menu Button with Morphing Animation */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden relative w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group"
+          >
+            <div className="absolute inset-0 rounded-full bg-primary/10 scale-0 group-hover:scale-100 transition-transform duration-300" />
+            {isMobileMenuOpen ? (
+              <X className="w-5 h-5 text-primary relative z-10 animate-spin-once" />
+            ) : (
+              <Menu className="w-5 h-5 text-primary relative z-10" />
+            )}
+          </button>
+        </div>
+
+        {/* Mobile Menu with Slide Animation */}
+        <div className={`md:hidden overflow-hidden transition-all duration-500 ${
+          isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}>
+          <div className="px-6 pb-6 space-y-3">
+            {navItems.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => scrollToSection(item.path)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-muted/50 hover:bg-primary/10 transition-all duration-300 group"
+                  style={{ 
+                    animationDelay: `${index * 100}ms`,
+                    animation: isMobileMenuOpen ? 'slideInRight 0.5s ease-out forwards' : 'none'
+                  }}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="font-medium">{item.name}</span>
+                </button>
+              );
+            })}
+            
+            <div className="pt-3 space-y-2">
+              <button
+                onClick={() => navigate('/login')}
+                className="w-full py-3 rounded-xl border border-border hover:border-primary/50 transition-colors font-medium"
+              >
+                Sign In
+              </button>
+
+              <button
+                onClick={() => navigate('/register')}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-secondary text-white font-medium hover:opacity-90 transition-opacity"
+              >
+                Get Started
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Decorative Elements */}
+      <div className="absolute top-full left-10 w-2 h-2 bg-primary/40 rounded-full animate-float" />
+      <div className="absolute top-full right-20 w-3 h-3 bg-secondary/40 rounded-full animate-float delay-500" />
+      <div className="absolute top-full left-1/3 w-2 h-2 bg-accent/40 rounded-full animate-float delay-1000" />
+    </header>
+  );
+};
+
 
 
 export default function LandingPage() {
+
 
   const navigate = useNavigate();
 
@@ -219,8 +492,15 @@ export default function LandingPage() {
         <div className="absolute bottom-40 left-1/4 w-2 h-2 bg-accent/30 rounded-full animate-bounce delay-700" />
       </div>
 
+      {/* Creative Header */}
+      <CreativeHeader navigate={navigate} />
+
+      {/* Spacer for fixed header */}
+      <div className="h-24" />
+
       {/* Hero Section */}
       <section ref={heroRef} className="relative px-6 py-20 lg:py-32 overflow-hidden">
+
         {/* Gradient Orbs */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-r from-secondary/20 to-accent/20 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -230,7 +510,7 @@ export default function LandingPage() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 text-primary text-sm font-medium mb-8 animate-fade-in-up border border-primary/20 shadow-lg shadow-primary/5 hover:shadow-primary/10 transition-shadow duration-500 cursor-pointer group"
             style={{ animationDelay: '0.1s' }}
           >
-            <Sparkles className="w-4 h-4 animate-pulse group-hover:rotate-12 transition-transform" />
+            <Sparkles className="w-4 h-4 animate-ping group-hover:rotate-12 transition-transform" />
             <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent font-semibold">
               AI-Powered Career Guidance Platform
             </span>
@@ -275,7 +555,7 @@ export default function LandingPage() {
               variant="outline" 
               size="lg"
               onClick={() => navigate('/login')}
-              className="text-lg px-8 hover:bg-primary/5 transition-all duration-300 hover:scale-105 border-2"
+              className="text-lg px-8 hover:bg-primary/5 hover:text-primary hover:border-primary/80 transition-all duration-300 hover:scale-105 border-primary/20"
             >
               Sign In
             </Button>
@@ -558,8 +838,60 @@ export default function LandingPage() {
             background-position: 100% 50%;
           }
         }
+
+        @keyframes slideInRight {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0) rotate(0deg);
+          }
+          25% {
+            transform: translateY(-10px) rotate(5deg);
+          }
+          50% {
+            transform: translateY(-5px) rotate(0deg);
+          }
+          75% {
+            transform: translateY(-15px) rotate(-5deg);
+          }
+        }
+
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+
+        .animate-spin-once {
+          animation: spin 0.3s ease-out;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(180deg); }
+        }
+
+        .perspective-1000 {
+          perspective: 1000px;
+        }
+
+        .rotate-y-12 {
+          transform: rotateY(12deg);
+        }
+
+        .rotate-x-12 {
+          transform: rotateX(12deg);
+        }
         
         .animate-fade-in-up {
+
           animation: fade-in-up 0.8s ease-out forwards;
           opacity: 0;
         }

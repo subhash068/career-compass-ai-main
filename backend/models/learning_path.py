@@ -84,21 +84,42 @@ class LearningPath(Base):
                     **step_dict,
                     "order": ps.order,
                     "is_completed": ps.is_completed,
+                    "isCompleted": ps.is_completed,
+                    "assessment_passed": ps.assessment_passed,
+                    "assessmentPassed": ps.assessment_passed,
+                    "can_complete": False,  # Will be set by service layer
                 })
+
         except Exception:
             # If steps can't be loaded, return empty list
             steps_list = []
+
+        # Safely serialize target role
+        target_role_dict = None
+        try:
+            if self.target_role:
+                target_role_dict = {
+                    "id": self.target_role.id,
+                    "title": getattr(self.target_role, 'title', None),
+                    "name": getattr(self.target_role, 'name', None),
+                    "description": getattr(self.target_role, 'description', None),
+                    "level": getattr(self.target_role, 'level', None),
+                }
+        except Exception:
+            target_role_dict = None
 
         return {
             "id": self.id,
             "user_id": self.user_id,
             "target_role_id": self.target_role_id,
+            "targetRole": target_role_dict,
             "steps": steps_list,
             "total_duration": self.total_duration,
             "progress": self.progress,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
 
 
 
@@ -134,7 +155,14 @@ class LearningPathStepAssociation(Base):
         server_default=text("0"),
     )
 
+    assessment_passed = Column(
+        Boolean,
+        nullable=False,
+        server_default=text("0"),
+    )
+
     step = relationship("LearningPathStep", back_populates="learning_path_associations")
+
     learning_path = relationship("LearningPath", back_populates="steps")
 
     __table_args__ = (

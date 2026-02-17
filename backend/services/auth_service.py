@@ -262,4 +262,10 @@ class AuthService:
     @staticmethod
     def _get_redis_client():
         import redis
-        return redis.Redis(host='localhost', port=6379, db=0)
+        return redis.Redis(
+            host='redis-19426.c239.us-east-1-2.ec2.cloud.redislabs.com',
+            port=19426,
+            decode_responses=True,
+            username="default",
+            password="8cWErxIfAC2l8PjEAfYLLp339h6Ekv2m",
+        )

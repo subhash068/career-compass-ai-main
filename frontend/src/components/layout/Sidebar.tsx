@@ -11,7 +11,10 @@ import {
   ChevronRight,
   LogOut,
   X,
-  Shield
+  Shield,
+  History,
+  FileText,
+  FileUser
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -22,9 +25,12 @@ import { Profile } from '@/components/Profile';
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/skill_selection', icon: Target, label: 'Skill Assessment' },
+  { to: '/assessment-history', icon: History, label: 'Assessment History' },
   { to: '/gaps', icon: TrendingUp, label: 'Gap Analysis' },
   { to: '/careers', icon: Briefcase, label: 'Career Matches' },
   { to: '/learning', icon: GraduationCap, label: 'Learning Path' },
+  { to: '/notes', icon: FileText, label: 'My Notes' },
+  { to: '/resumes', icon: FileUser, label: 'My Resumes' },
 ];
 
 const adminNavItems = [

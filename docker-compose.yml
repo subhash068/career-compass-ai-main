@@ -94,7 +94,22 @@ services:
     networks:
       - app-network
 
+  ngrok:
+    image: ngrok/ngrok:latest
+    command: http nginx:80 --domain=career-compass-ai.ngrok.io
+    environment:
+      - NGROK_AUTHTOKEN=39ks1hREd73ZGmgJSD4hgTCvLSF_6NzhbABJ3hLRNVKkSWD7q
+    ports:
+      - "4040:4040"
+    volumes:
+      - ./ngrok.yml:/etc/ngrok.yml
+    depends_on:
+      - nginx
+    networks:
+      - app-network
+
 volumes:
+
   mysql_data:
   redis_data:
   grafana_data:

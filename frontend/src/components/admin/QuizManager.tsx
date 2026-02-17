@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import axiosClient from '@/api/axiosClient';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 interface Question {
   id: number;
@@ -42,7 +44,15 @@ interface Question {
 interface Skill {
   id: number;
   name: string;
+  description?: string;
 }
+
+interface Domain {
+  id: number;
+  name: string;
+  skills: Skill[];
+}
+
 
 export default function QuizManager() {
   const { toast } = useToast();
@@ -50,10 +60,17 @@ export default function QuizManager() {
   
   const [questions, setQuestions] = useState<Question[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [domains, setDomains] = useState<Domain[]>([]);
+  const [selectedDomainId, setSelectedDomainId] = useState<string>('');
+  const [filteredSkills, setFilteredSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState('');
+  const [domainFilter, setDomainFilter] = useState<string>('all');
   const [skillFilter, setSkillFilter] = useState<string>('all');
   const [difficultyFilter, setDifficultyFilter] = useState<string>('all');
+  const [filteredViewSkills, setFilteredViewSkills] = useState<Skill[]>([]);
+
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
@@ -64,12 +81,15 @@ export default function QuizManager() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadSkillId, setUploadSkillId] = useState<string>('');
+  const [uploadSkillId, setUploadSkillId] = useState<string>('none');
+  const [activeTab, setActiveTab] = useState('view');
 
   // Form state
   const [formData, setFormData] = useState({
     skill_id: '',
+    domain_id: '',
     question_text: '',
+    question_type: 'multiple_choice',
     options: ['', '', '', ''],
     correct_answer: '',
     difficulty: 'medium',
@@ -79,7 +99,9 @@ export default function QuizManager() {
   useEffect(() => {
     fetchQuestions();
     fetchSkills();
-  }, [search, skillFilter, difficultyFilter, page]);
+    fetchDomainsWithSkills();
+  }, [search, domainFilter, skillFilter, difficultyFilter, page]);
+
 
   const fetchQuestions = async () => {
     try {
@@ -88,7 +110,9 @@ export default function QuizManager() {
       params.append('skip', ((page - 1) * limit).toString());
       params.append('limit', limit.toString());
       if (search) params.append('search', search);
+      if (domainFilter !== 'all') params.append('domain_id', domainFilter);
       if (skillFilter !== 'all') params.append('skill_id', skillFilter);
+
       if (difficultyFilter !== 'all') params.append('difficulty', difficultyFilter);
 
       const response = await axiosClient.get(`/admin/quiz/questions?${params.toString()}`);
@@ -115,13 +139,37 @@ export default function QuizManager() {
     }
   };
 
+  const fetchDomainsWithSkills = async () => {
+    try {
+      const response = await axiosClient.get('/admin/quiz/domains-with-skills');
+      setDomains(response.data.domains || []);
+    } catch (error) {
+      console.error('Error fetching domains:', error);
+    }
+  };
+
+  const handleDomainChange = (domainId: string) => {
+    setSelectedDomainId(domainId);
+    setFormData({...formData, domain_id: domainId, skill_id: ''});
+    
+    // Filter skills for selected domain
+    const selectedDomain = domains.find(d => d.id.toString() === domainId);
+    setFilteredSkills(selectedDomain ? selectedDomain.skills : []);
+  };
+
+
   const handleCreateQuestion = async () => {
     try {
       const data = {
         ...formData,
         skill_id: parseInt(formData.skill_id),
-        options: formData.options.filter(opt => opt.trim() !== '')
+        options: formData.question_type === 'multiple_choice' 
+          ? formData.options.filter(opt => opt.trim() !== '')
+          : formData.question_type === 'true_false' 
+            ? ['True', 'False']
+            : []
       };
+
 
       await axiosClient.post('/admin/quiz/questions', data);
       
@@ -149,8 +197,13 @@ export default function QuizManager() {
       const data = {
         ...formData,
         skill_id: parseInt(formData.skill_id),
-        options: formData.options.filter(opt => opt.trim() !== '')
+        options: formData.question_type === 'multiple_choice' 
+          ? formData.options.filter(opt => opt.trim() !== '')
+          : formData.question_type === 'true_false' 
+            ? ['True', 'False']
+            : []
       };
+
 
       await axiosClient.put(`/admin/quiz/questions/${editingQuestion.id}`, data);
       
@@ -228,9 +281,10 @@ export default function QuizManager() {
 
     const formData = new FormData();
     formData.append('file', uploadFile);
-    if (uploadSkillId) {
+    if (uploadSkillId && uploadSkillId !== 'none') {
       formData.append('skill_id', uploadSkillId);
     }
+
 
     try {
       const response = await axiosClient.post('/admin/quiz/upload-excel', formData, {
@@ -246,8 +300,9 @@ export default function QuizManager() {
 
       setIsUploadModalOpen(false);
       setUploadFile(null);
-      setUploadSkillId('');
+      setUploadSkillId('none');
       fetchQuestions();
+
     } catch (error: any) {
       toast({
         title: "Upload Failed",
@@ -281,9 +336,22 @@ export default function QuizManager() {
 
   const openEditModal = (question: Question) => {
     setEditingQuestion(question);
+    
+    // Find the domain for this skill
+    const skillDomain = domains.find(d => 
+      d.skills.some(s => s.id === question.skill_id)
+    );
+    
+    if (skillDomain) {
+      setSelectedDomainId(skillDomain.id.toString());
+      setFilteredSkills(skillDomain.skills);
+    }
+    
     setFormData({
       skill_id: question.skill_id.toString(),
+      domain_id: skillDomain ? skillDomain.id.toString() : '',
       question_text: question.question_text,
+      question_type: question.question_type || 'multiple_choice',
       options: [...question.options, '', '', '', ''].slice(0, 4),
       correct_answer: question.correct_answer,
       difficulty: question.difficulty,
@@ -292,16 +360,23 @@ export default function QuizManager() {
     setIsEditModalOpen(true);
   };
 
+
   const resetForm = () => {
     setFormData({
       skill_id: '',
+      domain_id: '',
       question_text: '',
+      question_type: 'multiple_choice',
       options: ['', '', '', ''],
       correct_answer: '',
       difficulty: 'medium',
       explanation: ''
     });
+    setSelectedDomainId('');
+    setFilteredSkills([]);
   };
+
+
 
   const toggleSelectAll = () => {
     if (selectedQuestions.length === questions.length) {
@@ -328,296 +403,490 @@ export default function QuizManager() {
     }
   };
 
+  const getQuestionTypeColor = (questionType: string) => {
+    switch (questionType) {
+      case 'multiple_choice': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+      case 'true_false': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
+      case 'short_answer': return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
+      default: return 'bg-gray-500/10 text-gray-600 border-gray-500/20';
+    }
+  };
+
+  const getQuestionTypeLabel = (questionType: string) => {
+    switch (questionType) {
+      case 'multiple_choice': return 'Multiple Choice';
+      case 'true_false': return 'True/False';
+      case 'short_answer': return 'Short Answer';
+      default: return questionType;
+    }
+  };
+
+
   return (
     <div className="space-y-6">
-      {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="flex gap-2">
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Question
-          </Button>
-          <Button variant="outline" onClick={() => setIsUploadModalOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Excel
-          </Button>
-          <Button variant="outline" onClick={downloadTemplate}>
-            <Download className="h-4 w-4 mr-2" />
-            Template
-          </Button>
-        </div>
-        {selectedQuestions.length > 0 && (
-          <Button variant="destructive" onClick={handleBulkDelete}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete Selected ({selectedQuestions.length})
-          </Button>
-        )}
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 bg-primary">
+          <TabsTrigger value="add" className='text-white'>Add Questions</TabsTrigger>
+          <TabsTrigger value="view" className='text-white'>View Questions</TabsTrigger>
+        </TabsList>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search questions..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
+        {/* Add Questions Tab */}
+        <TabsContent value="add" className="space-y-6">
+          <Tabs defaultValue="manual" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2 max-w-md bg-black">
+              <TabsTrigger value="manual" className='text-white'>Manual</TabsTrigger>
+              <TabsTrigger value="file" className='text-white'>File</TabsTrigger>
+            </TabsList>
+
+            {/* Manual Sub-tab */}
+            <TabsContent value="manual" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Create New Question</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Domain</Label>
+                    <Select 
+                      value={selectedDomainId} 
+                      onValueChange={handleDomainChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a domain" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {domains.map(domain => (
+                          <SelectItem key={domain.id} value={domain.id.toString()}>
+                            {domain.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Skill</Label>
+                    <Select 
+                      value={formData.skill_id} 
+                      onValueChange={(value) => setFormData({...formData, skill_id: value})}
+                      disabled={!selectedDomainId || filteredSkills.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedDomainId ? "Select a skill" : "Select a domain first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredSkills.map(skill => (
+                          <SelectItem key={skill.id} value={skill.id.toString()}>
+                            {skill.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Question Text</Label>
+                    <Textarea
+                      value={formData.question_text}
+                      onChange={(e) => setFormData({...formData, question_text: e.target.value})}
+                      placeholder="Enter your question..."
+                      rows={3}
+                    />
+                  </div>
+                  <div>
+                    <Label>Options (one per line)</Label>
+                    {formData.options.map((option, index) => (
+                      <Input
+                        key={index}
+                        value={option}
+                        onChange={(e) => {
+                          const newOptions = [...formData.options];
+                          newOptions[index] = e.target.value;
+                          setFormData({...formData, options: newOptions});
+                        }}
+                        placeholder={`Option ${index + 1}`}
+                        className="mb-2"
+                      />
+                    ))}
+                  </div>
+                  <div>
+                    <Label>Correct Answer</Label>
+                    <Input
+                      value={formData.correct_answer}
+                      onChange={(e) => setFormData({...formData, correct_answer: e.target.value})}
+                      placeholder="Enter the correct answer"
+                    />
+                  </div>
+                  <div>
+                    <Label>Difficulty</Label>
+                    <Select 
+                      value={formData.difficulty} 
+                      onValueChange={(value) => setFormData({...formData, difficulty: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="easy">Easy</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="hard">Hard</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Explanation (Optional)</Label>
+                    <Textarea
+                      value={formData.explanation}
+                      onChange={(e) => setFormData({...formData, explanation: e.target.value})}
+                      placeholder="Explain why this is the correct answer..."
+                      rows={2}
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <Button onClick={handleCreateQuestion}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Question
+                    </Button>
+                    <Button variant="outline" onClick={resetForm}>
+                      <X className="h-4 w-4 mr-2" />
+                      Clear Form
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* File Sub-tab */}
+            <TabsContent value="file" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Upload Questions from File</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <Alert className='bg-yellow-100'>
+                    <AlertCircle className="h-4 w-4 bg-yellow-400 rounded-3xl" />
+                    <AlertDescription>
+                      Upload an Excel file (.xlsx, .xls) or CSV file (.csv) with question data. 
+                      Select a domain and skill, then upload your file.
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <div>
+                    <Label>Domain</Label>
+                    <Select 
+                      value={selectedDomainId} 
+                      onValueChange={handleDomainChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a domain" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {domains.map(domain => (
+                          <SelectItem key={domain.id} value={domain.id.toString()}>
+                            {domain.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>Skill</Label>
+                    <Select 
+                      value={uploadSkillId} 
+                      onValueChange={setUploadSkillId}
+                      disabled={!selectedDomainId || filteredSkills.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedDomainId ? "Select a skill" : "Select a domain first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Use skill_id from file</SelectItem>
+                        {filteredSkills.map(skill => (
+                          <SelectItem key={skill.id} value={skill.id.toString()}>
+                            {skill.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>Upload File</Label>
+                    <Input
+                      className=''
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                      ref={fileInputRef}
+                    />
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Supported formats: Excel (.xlsx, .xls) or CSV (.csv)
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button onClick={handleFileUpload} disabled={!uploadFile}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Questions
+                    </Button>
+                    <Button variant="outline" onClick={downloadTemplate}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Template
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+          </Tabs>
+        </TabsContent>
+
+
+        {/* View Questions Tab */}
+        <TabsContent value="view" className="space-y-6">
+          {/* Header Actions */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+            <div className="flex gap-2">
+              <Button onClick={() => setActiveTab('add')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Question
+              </Button>
             </div>
-            <Select value={skillFilter} onValueChange={setSkillFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Filter by skill" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Skills</SelectItem>
-                {skills.map(skill => (
-                  <SelectItem key={skill.id} value={skill.id.toString()}>
-                    {skill.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Difficulty" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Levels</SelectItem>
-                <SelectItem value="easy">Easy</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="hard">Hard</SelectItem>
-              </SelectContent>
-            </Select>
+
+            {selectedQuestions.length > 0 && (
+              <Button variant="destructive" onClick={handleBulkDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Selected ({selectedQuestions.length})
+              </Button>
+            )}
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Questions Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Questions ({total})</span>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={selectedQuestions.length === questions.length && questions.length > 0}
-                onCheckedChange={toggleSelectAll}
-              />
-              <span className="text-sm font-normal text-muted-foreground">
-                Select All
-              </span>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-20" />
-              ))}
-            </div>
-          ) : questions.length === 0 ? (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>No questions found. Create your first question or upload from Excel.</AlertDescription>
-            </Alert>
-          ) : (
-            <div className="space-y-4">
-              {questions.map((question) => (
-                <div
-                  key={question.id}
-                  className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <Checkbox
-                    checked={selectedQuestions.includes(question.id)}
-                    onCheckedChange={() => toggleSelectQuestion(question.id)}
+          {/* Filters */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search questions..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-10"
                   />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <p className="font-medium mb-2">{question.question_text}</p>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          <Badge variant="outline" className={getDifficultyColor(question.difficulty)}>
-                            {question.difficulty}
-                          </Badge>
-                          <Badge variant="outline">{question.skill_name}</Badge>
+                </div>
+                <Select 
+                  value={domainFilter} 
+                  onValueChange={(value) => {
+                    setDomainFilter(value);
+                    setSkillFilter('all');
+                    // Filter skills based on selected domain
+                    if (value === 'all') {
+                      setFilteredViewSkills([]);
+                    } else {
+                      const selectedDomain = domains.find(d => d.id.toString() === value);
+                      setFilteredViewSkills(selectedDomain ? selectedDomain.skills : []);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filter by domain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Domains</SelectItem>
+                    {domains.map(domain => (
+                      <SelectItem key={domain.id} value={domain.id.toString()}>
+                        {domain.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select 
+                  value={skillFilter} 
+                  onValueChange={setSkillFilter}
+                  disabled={domainFilter === 'all'}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder={domainFilter === 'all' ? "Select domain first" : "Filter by skill"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Skills</SelectItem>
+                    {filteredViewSkills.map(skill => (
+                      <SelectItem key={skill.id} value={skill.id.toString()}>
+                        {skill.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Levels</SelectItem>
+                    <SelectItem value="easy">Easy</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Questions Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Questions ({total})</span>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={selectedQuestions.length === questions.length && questions.length > 0}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                  <span className="text-sm font-normal text-muted-foreground">
+                    Select All
+                  </span>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-20" />
+                  ))}
+                </div>
+              ) : questions.length === 0 ? (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>No questions found. Create your first question or upload from Excel.</AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-4">
+                  {questions.map((question) => (
+                    <div
+                      key={question.id}
+                      className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <Checkbox
+                        checked={selectedQuestions.includes(question.id)}
+                        onCheckedChange={() => toggleSelectQuestion(question.id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <p className="font-medium mb-2">{question.question_text}</p>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              <Badge variant="outline" className={getDifficultyColor(question.difficulty)}>
+                                {question.difficulty}
+                              </Badge>
+                              <Badge variant="outline" className={getQuestionTypeColor(question.question_type)}>
+                                {getQuestionTypeLabel(question.question_type)}
+                              </Badge>
+                              <Badge variant="outline">{question.skill_name}</Badge>
+                            </div>
+
+                            <div className="text-sm text-muted-foreground">
+                              <span className="font-medium">Options:</span> {question.options.join(', ')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              <span className="font-medium">Answer:</span> {question.correct_answer}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditModal(question)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteQuestion(question.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          <span className="font-medium">Options:</span> {question.options.join(', ')}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          <span className="font-medium">Answer:</span> {question.correct_answer}
-                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Pagination */}
+                  {total > limit && (
+                    <div className="flex justify-between items-center pt-4">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, total)} of {total}
                       </div>
                       <div className="flex gap-2">
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditModal(question)}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage(page - 1)}
+                          disabled={page === 1}
                         >
-                          <Edit2 className="h-4 w-4" />
+                          Previous
                         </Button>
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteQuestion(question.id)}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage(page + 1)}
+                          disabled={page * limit >= total}
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          Next
                         </Button>
                       </div>
                     </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Pagination */}
-              {total > limit && (
-                <div className="flex justify-between items-center pt-4">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, total)} of {total}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage(page - 1)}
-                      disabled={page === 1}
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage(page + 1)}
-                      disabled={page * limit >= total}
-                    >
-                      Next
-                    </Button>
-                  </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* Create Question Modal */}
-      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create New Question</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>Skill</Label>
-              <Select 
-                value={formData.skill_id} 
-                onValueChange={(value) => setFormData({...formData, skill_id: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a skill" />
-                </SelectTrigger>
-                <SelectContent>
-                  {skills.map(skill => (
-                    <SelectItem key={skill.id} value={skill.id.toString()}>
-                      {skill.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Question Text</Label>
-              <Textarea
-                value={formData.question_text}
-                onChange={(e) => setFormData({...formData, question_text: e.target.value})}
-                placeholder="Enter your question..."
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label>Options (one per line)</Label>
-              {formData.options.map((option, index) => (
-                <Input
-                  key={index}
-                  value={option}
-                  onChange={(e) => {
-                    const newOptions = [...formData.options];
-                    newOptions[index] = e.target.value;
-                    setFormData({...formData, options: newOptions});
-                  }}
-                  placeholder={`Option ${index + 1}`}
-                  className="mb-2"
-                />
-              ))}
-            </div>
-            <div>
-              <Label>Correct Answer</Label>
-              <Input
-                value={formData.correct_answer}
-                onChange={(e) => setFormData({...formData, correct_answer: e.target.value})}
-                placeholder="Enter the correct answer"
-              />
-            </div>
-            <div>
-              <Label>Difficulty</Label>
-              <Select 
-                value={formData.difficulty} 
-                onValueChange={(value) => setFormData({...formData, difficulty: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="easy">Easy</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="hard">Hard</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Explanation (Optional)</Label>
-              <Textarea
-                value={formData.explanation}
-                onChange={(e) => setFormData({...formData, explanation: e.target.value})}
-                placeholder="Explain why this is the correct answer..."
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setIsCreateModalOpen(false);
-              resetForm();
-            }}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateQuestion}>Create Question</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Question Modal */}
+
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Question</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Same form fields as create */}
+            <div>
+              <Label>Domain</Label>
+              <Select 
+                value={selectedDomainId} 
+                onValueChange={handleDomainChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a domain" />
+                </SelectTrigger>
+                <SelectContent>
+                  {domains.map(domain => (
+                    <SelectItem key={domain.id} value={domain.id.toString()}>
+                      {domain.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label>Skill</Label>
               <Select 
                 value={formData.skill_id} 
                 onValueChange={(value) => setFormData({...formData, skill_id: value})}
+                disabled={!selectedDomainId || filteredSkills.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a skill" />
+                  <SelectValue placeholder={selectedDomainId ? "Select a skill" : "Select a domain first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {skills.map(skill => (
+                  {filteredSkills.map(skill => (
                     <SelectItem key={skill.id} value={skill.id.toString()}>
                       {skill.name}
                     </SelectItem>
@@ -625,6 +894,7 @@ export default function QuizManager() {
                 </SelectContent>
               </Select>
             </div>
+
             <div>
               <Label>Question Text</Label>
               <Textarea
@@ -693,64 +963,6 @@ export default function QuizManager() {
               Cancel
             </Button>
             <Button onClick={handleUpdateQuestion}>Update Question</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Upload Modal */}
-      <Dialog open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Upload Questions from Excel</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Alert>
-              <FileSpreadsheet className="h-4 w-4" />
-              <AlertDescription>
-                Upload an Excel file with columns: question_text, options, correct_answer, difficulty, explanation, skill_id
-              </AlertDescription>
-            </Alert>
-            <div>
-              <Label>Default Skill (optional)</Label>
-              <Select 
-                value={uploadSkillId} 
-                onValueChange={setUploadSkillId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select default skill" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Use skill_id from file</SelectItem>
-                  {skills.map(skill => (
-                    <SelectItem key={skill.id} value={skill.id.toString()}>
-                      {skill.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Excel File</Label>
-              <Input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                ref={fileInputRef}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setIsUploadModalOpen(false);
-              setUploadFile(null);
-              setUploadSkillId('');
-            }}>
-              Cancel
-            </Button>
-            <Button onClick={handleFileUpload} disabled={!uploadFile}>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

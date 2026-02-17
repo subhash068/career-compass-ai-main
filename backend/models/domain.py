@@ -12,6 +12,8 @@ class Domain(Base):
 
     # Relationships
     skills = relationship("Skill", back_populates="domain", cascade="all, delete-orphan")
+    job_roles = relationship("JobRole", back_populates="domain")
+
 
     def to_dict(self):
         return {

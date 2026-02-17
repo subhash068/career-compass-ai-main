@@ -61,3 +61,42 @@ def get_career_details(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/compare")
+def compare_careers(
+    role_ids: list[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Compare multiple career options side by side
+    """
+    try:
+        return CareerService.compare_careers(
+            db=db,
+            user_id=current_user.id,
+            role_ids=role_ids,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/trending")
+def get_trending_careers(
+    limit: int = 5,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get trending careers based on market growth and demand
+    """
+    try:
+        return CareerService.get_trending_careers(
+            db=db,
+            limit=limit,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

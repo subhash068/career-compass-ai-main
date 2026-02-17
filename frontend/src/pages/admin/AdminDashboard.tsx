@@ -16,8 +16,10 @@ import {
   Shield,
   LogOut,
   Menu,
-  X
+  X,
+  FolderTree
 } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import axiosClient from '@/api/axiosClient';
 
@@ -30,6 +32,8 @@ import SystemMonitor from '@/components/admin/SystemMonitor';
 import LogViewer from '@/components/admin/LogViewer';
 import CareerAnalytics from '@/components/admin/CareerAnalytics';
 import UserForm from '@/components/admin/UserForm';
+import DomainSkillsManager from '@/components/admin/DomainSkillsManager';
+
 
 interface SystemStats {
   total_users: number;
@@ -129,11 +133,13 @@ export default function AdminDashboard() {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'users', label: 'User Management', icon: Users },
+    { id: 'domains', label: 'Domain & Skills', icon: FolderTree },
     { id: 'quiz', label: 'Quiz Management', icon: HelpCircle },
     { id: 'monitoring', label: 'System Monitor', icon: Activity },
     { id: 'logs', label: 'Logs & Errors', icon: FileText },
     { id: 'analytics', label: 'Career Analytics', icon: TrendingUp },
   ];
+
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -141,20 +147,20 @@ export default function AdminDashboard() {
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-4 left-4 z-50 lg:hidden"
+        className="fixed top-2 left-0 z-50 bg-lime-300 lg:hidden border-y-sidebar-border"
         onClick={() => setSidebarOpen(!sidebarOpen)}
       >
-        {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        {sidebarOpen ? <X className="h-10 w-10 border-gray-950" /> : <Menu className="h-20 w-20" />}
       </Button>
 
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r transform transition-transform duration-200 lg:translate-x-0 lg:static",
+          "fixed top-8 inset-y-0 left-0 z-40 w-64 bg-card border-r transform transition-transform duration-200 lg:translate-x-0 lg:static",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="p-6">
+        <div className="p-6 my-7">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
               <Shield className="h-5 w-5 text-primary-foreground" />
@@ -205,7 +211,7 @@ export default function AdminDashboard() {
             </div>
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full bg-red-500 text-white hover:bg-rose-400 hover:text-black"
               onClick={handleLogout}
             >
               <LogOut className="h-4 w-4 mr-2" />
@@ -395,8 +401,13 @@ export default function AdminDashboard() {
               </div>
             </TabsContent>
 
+            {/* Domain & Skills Tab */}
+            <TabsContent value="domains">
+              <DomainSkillsManager />
+            </TabsContent>
 
             {/* Quiz Tab */}
+
             <TabsContent value="quiz">
               <QuizManager />
             </TabsContent>

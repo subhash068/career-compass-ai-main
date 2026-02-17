@@ -37,6 +37,12 @@ from routes.chatbot import router as chatbot_router
 from routes.admin import router as admin_router
 from routes.admin_quiz import router as admin_quiz_router
 from routes.admin_logs import router as admin_logs_router
+from routes.admin_domains import router as admin_domains_router
+from routes.user_notes import router as user_notes_router
+from routes.resume import router as resume_router
+
+
+
 
 
 # DATABASE_URL from models.database
@@ -86,7 +92,9 @@ app.include_router(chatbot_router, tags=["Chatbot"])
 app.include_router(admin_router, tags=["Admin"])
 app.include_router(admin_quiz_router, tags=["Admin Quiz"])
 app.include_router(admin_logs_router, tags=["Admin Logs"])
-
+app.include_router(admin_domains_router, tags=["Admin Domains & Skills"])
+app.include_router(user_notes_router, tags=["User Notes"])
+app.include_router(resume_router, tags=["Resumes"])
 
 
 # -----------------------------

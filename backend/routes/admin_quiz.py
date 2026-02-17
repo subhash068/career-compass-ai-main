@@ -12,7 +12,10 @@ from models.database import get_db
 from models.user import User
 from models.skill_question import SkillQuestion
 from models.skill import Skill
+from models.domain import Domain
 from routes.auth_fastapi import get_current_user
+from fastapi.responses import StreamingResponse
+
 
 router = APIRouter(prefix="/admin/quiz", tags=["Admin Quiz Management"])
 
@@ -32,6 +35,7 @@ def get_all_questions(
     skip: int = 0,
     limit: int = 100,
     skill_id: Optional[int] = None,
+    domain_id: Optional[int] = None,
     difficulty: Optional[str] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -45,6 +49,9 @@ def get_all_questions(
         
         if skill_id:
             query = query.filter(SkillQuestion.skill_id == skill_id)
+        
+        if domain_id:
+            query = query.join(Skill).filter(Skill.domain_id == domain_id)
         
         if difficulty:
             query = query.filter(SkillQuestion.difficulty == difficulty)
@@ -128,16 +135,18 @@ def create_question(
         if not skill:
             raise HTTPException(status_code=400, detail="Skill not found")
         
-        # Create question
+        # Create question without options first
         question = SkillQuestion(
             skill_id=question_data["skill_id"],
             question_text=question_data["question_text"],
             question_type=question_data.get("question_type", "multiple_choice"),
-            options=question_data.get("options", []),
             correct_answer=question_data["correct_answer"],
             difficulty=question_data.get("difficulty", "medium"),
             explanation=question_data.get("explanation"),
         )
+        
+        # Set options using the model's method to properly serialize to JSON
+        question.set_options(question_data.get("options", []))
         
         db.add(question)
         db.commit()
@@ -349,16 +358,18 @@ async def upload_excel(
                     errors.append(f"Row {index + 2}: Skill with ID {question_skill_id} not found")
                     continue
                 
-                # Create question
+                # Create question without options first
                 question = SkillQuestion(
                     skill_id=question_skill_id,
                     question_text=str(row['question_text']).strip(),
                     question_type='multiple_choice',
-                    options=options,
                     correct_answer=str(row['correct_answer']).strip(),
                     difficulty=str(row.get('difficulty', 'medium')).strip().lower(),
                     explanation=str(row.get('explanation', '')).strip() if not pd.isna(row.get('explanation')) else None,
                 )
+                
+                # Set options using the model's method to properly serialize to JSON
+                question.set_options(options)
                 
                 db.add(question)
                 created_questions.append({
@@ -389,10 +400,12 @@ async def upload_excel(
 
 @router.get("/download-template")
 def download_excel_template(
+    db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
     """
     Download Excel template for bulk question upload
+    Includes a reference sheet with all available skills and their IDs
     """
     try:
         # Create template DataFrame
@@ -425,26 +438,73 @@ def download_excel_template(
         
         df = pd.DataFrame(template_data)
         
+        # Fetch all skills with their domain names for reference
+        skills = db.query(Skill, Domain).join(Domain, Skill.domain_id == Domain.id).all()
+        
+        # Create skills reference DataFrame
+        skills_data = {
+            'skill_id': [skill.id for skill, _ in skills],
+            'skill_name': [skill.name for skill, _ in skills],
+            'domain_name': [domain.name for _, domain in skills],
+            'description': [skill.description[:50] + '...' if skill.description and len(skill.description) > 50 else skill.description for skill, _ in skills]
+        }
+        
+        skills_df = pd.DataFrame(skills_data)
+        
         # Create Excel file in memory
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Questions')
-            
-            # Get workbook and worksheet for formatting
-            workbook = writer.book
-            worksheet = writer.sheets['Questions']
-            
-            # Adjust column widths
-            worksheet.column_dimensions['A'].width = 50  # question_text
-            worksheet.column_dimensions['B'].width = 40  # options
-            worksheet.column_dimensions['C'].width = 20  # correct_answer
-            worksheet.column_dimensions['D'].width = 15  # difficulty
-            worksheet.column_dimensions['E'].width = 50  # explanation
-            worksheet.column_dimensions['F'].width = 10  # skill_id
+        
+        # Use xlsxwriter engine which is more reliable
+        try:
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                # Write questions template sheet
+                df.to_excel(writer, index=False, sheet_name='Questions')
+                
+                # Write skills reference sheet
+                skills_df.to_excel(writer, index=False, sheet_name='Skills Reference')
+                
+                # Get workbook and worksheets for formatting
+                workbook = writer.book
+                questions_sheet = writer.sheets['Questions']
+                skills_sheet = writer.sheets['Skills Reference']
+                
+                # Format Questions sheet
+                questions_sheet.set_column('A:A', 50)  # question_text
+                questions_sheet.set_column('B:B', 40)  # options
+                questions_sheet.set_column('C:C', 20)  # correct_answer
+                questions_sheet.set_column('D:D', 15)  # difficulty
+                questions_sheet.set_column('E:E', 50)  # explanation
+                questions_sheet.set_column('F:F', 10)  # skill_id
+                
+                # Format Skills Reference sheet
+                skills_sheet.set_column('A:A', 10)   # skill_id
+                skills_sheet.set_column('B:B', 30)   # skill_name
+                skills_sheet.set_column('C:C', 25)   # domain_name
+                skills_sheet.set_column('D:D', 50)   # description
+                
+                # Add header format
+                header_format = workbook.add_format({
+                    'bold': True,
+                    'bg_color': '#D3D3D3',
+                    'border': 1
+                })
+                
+                # Apply header format to Questions sheet
+                for col_num, value in enumerate(df.columns.values):
+                    questions_sheet.write(0, col_num, value, header_format)
+                
+                # Apply header format to Skills Reference sheet
+                for col_num, value in enumerate(skills_df.columns.values):
+                    skills_sheet.write(0, col_num, value, header_format)
+
+                
+        except ImportError:
+            # Fallback to openpyxl if xlsxwriter not available
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Questions')
+                skills_df.to_excel(writer, index=False, sheet_name='Skills Reference')
         
         output.seek(0)
-        
-        from fastapi.responses import StreamingResponse
         
         return StreamingResponse(
             output,
@@ -453,7 +513,11 @@ def download_excel_template(
         )
         
     except Exception as e:
+        import traceback
+        error_detail = f"Error generating template: {str(e)}\n{traceback.format_exc()}"
+        print(error_detail)  # Log to console
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.get("/stats")
@@ -486,5 +550,37 @@ def get_quiz_stats(
             "by_difficulty": {d: c for d, c in difficulty_counts},
             "by_skill": {s: c for s, c in skill_counts},
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/domains-with-skills")
+def get_domains_with_skills(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Get all domains with their associated skills for cascading dropdown
+    """
+    try:
+        domains = db.query(Domain).all()
+        
+        result = []
+        for domain in domains:
+            skills = db.query(Skill).filter(Skill.domain_id == domain.id).all()
+            result.append({
+                "id": domain.id,
+                "name": domain.name,
+                "skills": [
+                    {
+                        "id": skill.id,
+                        "name": skill.name,
+                        "description": skill.description
+                    }
+                    for skill in skills
+                ]
+            })
+        
+        return {"domains": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

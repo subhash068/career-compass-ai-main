@@ -4,6 +4,8 @@ Handles log viewing, error tracking, and system monitoring
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+
 from typing import List, Optional, Dict, Any
 import os
 import glob
@@ -26,40 +28,77 @@ def require_admin(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+def format_uptime(seconds):
+    """Format uptime seconds into human readable string"""
+    days = seconds // 86400
+    hours = (seconds % 86400) // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    
+    parts = []
+    if days > 0:
+        parts.append(f"{days}d")
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+    parts.append(f"{secs}s")
+    
+    return " ".join(parts)
+
+
 @router.get("/files")
 def get_log_files(
     current_user: User = Depends(require_admin),
 ):
     """
-    Get list of available log files
+    Get list of available log files from system
     """
     try:
         log_files = []
         
-        # Common log locations
+        # Safe log locations - only accessible directories
         log_paths = [
+            # Application logs (current project)
             "logs/",
             "backend/logs/",
-            "/var/log/career-compass/",
-            "."
+            ".",
         ]
         
+        # Add user-specific temp directory if accessible
+        try:
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            if os.path.exists(temp_dir):
+                log_paths.append(temp_dir)
+        except:
+            pass
+
+        
         for path in log_paths:
-            if os.path.exists(path):
-                # Find log files
-                patterns = ['*.log', '*.txt', 'app.log', 'error.log', 'access.log']
-                for pattern in patterns:
-                    files = glob.glob(os.path.join(path, pattern))
-                    for file in files:
-                        if os.path.isfile(file):
-                            stat = os.stat(file)
-                            log_files.append({
-                                "name": os.path.basename(file),
-                                "path": file,
-                                "size": stat.st_size,
-                                "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                                "size_human": f"{stat.st_size / 1024:.2f} KB" if stat.st_size < 1024*1024 else f"{stat.st_size / (1024*1024):.2f} MB"
-                            })
+            try:
+                if os.path.exists(path):
+                    patterns = ['*.log', '*.txt', '*.evtx', 'error.log', 'access.log', 'debug.log', 'app.log']
+                    for pattern in patterns:
+                        try:
+                            files = glob.glob(os.path.join(path, pattern))
+                            for file in files:
+                                if os.path.isfile(file):
+                                    try:
+                                        stat = os.stat(file)
+                                        log_files.append({
+                                            "name": os.path.basename(file),
+                                            "path": file,
+                                            "size": stat.st_size,
+                                            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                                            "size_human": f"{stat.st_size / 1024:.2f} KB" if stat.st_size < 1024*1024 else f"{stat.st_size / (1024*1024):.2f} MB"
+                                        })
+                                    except (OSError, PermissionError):
+                                        continue
+                        except (OSError, PermissionError):
+                            continue
+            except (OSError, PermissionError):
+                continue
         
         # Sort by modification time (newest first)
         log_files.sort(key=lambda x: x["modified"], reverse=True)
@@ -270,8 +309,9 @@ def get_system_metrics(
                 "packets_recv": network.packets_recv
             },
             "top_processes": processes[:10],
-            "uptime_seconds": int(time.time() - psutil.boot_time())
+            "uptime": format_uptime(int(time.time() - psutil.boot_time()))
         }
+
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -290,7 +330,7 @@ def get_service_status(
         
         # Database status
         try:
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
             services.append({
                 "name": "Database",
                 "status": "healthy",
@@ -303,34 +343,40 @@ def get_service_status(
                 "message": str(e)
             })
         
-        # Check if AI services are available
+        # Check if AI/LLM services are actually working
         try:
             from ai.llm.llm_service import LLMService
+            llm_service = LLMService()
+            # Try to get available models to verify service is working
+            models = llm_service.get_available_models()
             services.append({
                 "name": "AI/LLM Service",
                 "status": "healthy",
-                "message": "Available"
+                "message": f"{len(models)} models available"
             })
         except Exception as e:
             services.append({
                 "name": "AI/LLM Service",
                 "status": "warning",
-                "message": "Not configured"
+                "message": f"Not available: {str(e)[:50]}"
             })
         
-        # Check vector store
+        # Check vector store is actually working
         try:
             from ai.embeddings.vector_store import VectorStore
+            vector_store = VectorStore()
+            # Try to get collection count to verify connection
+            collections = vector_store.list_collections()
             services.append({
                 "name": "Vector Store",
                 "status": "healthy",
-                "message": "Available"
+                "message": f"{len(collections)} collections"
             })
         except Exception as e:
             services.append({
                 "name": "Vector Store",
                 "status": "warning",
-                "message": "Not configured"
+                "message": f"Not available: {str(e)[:50]}"
             })
         
         return {

@@ -1,58 +1,33 @@
-import { useEffect, useState } from 'react';
 import { StatCard } from '@/components/ui/stat-card';
 import { SkillsOverview } from '@/components/dashboard/SkillsOverview';
 import { TopGaps } from '@/components/dashboard/TopGaps';
 import { CareerMatches } from '@/components/dashboard/CareerMatches';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
-import { Target, TrendingUp, Briefcase, GraduationCap, Sparkles, Loader2 } from 'lucide-react';
+import { CompletedAssessments } from '@/components/dashboard/CompletedAssessments';
+import { SkillProgressChart } from '@/components/dashboard/SkillProgressChart';
+import { QuickActions } from '@/components/dashboard/QuickActions';
+import { LearningPathCard } from '@/components/dashboard/LearningPathCard';
+import { Achievements } from '@/components/dashboard/Achievements';
+import { WeeklyGoals } from '@/components/dashboard/WeeklyGoals';
+import { Target, TrendingUp, Briefcase, GraduationCap, Sparkles, Loader2, BarChart3, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { skillsApi } from '@/api/skills.api';
-import { careerApi } from '@/api/career.api';
-import { CareerMatch, SkillGap, UserSkill } from '@/types';
+import { useApp } from '@/contexts/AppContext';
+import { useState } from 'react';
 
 export default function Dashboard() {
-  const [userSkills, setUserSkills] = useState<UserSkill[]>([]);
-  const [careerMatches, setCareerMatches] = useState<CareerMatch[]>([]);
-  const [allGaps, setAllGaps] = useState<SkillGap[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { 
+    userSkills, 
+    careerMatches, 
+    allGaps, 
+    learningPath,
+    isLoadingSkills, 
+    isLoadingCareers,
+    isLoadingLearning,
+    refreshCareerMatches
+  } = useApp();
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch skills analysis
-        const skillsAnalysis = await skillsApi.analyzeSkills();
-        setUserSkills(skillsAnalysis.skills || []);
-        setAllGaps((skillsAnalysis.gaps || []).map(gap => ({
-          skillId: parseInt(gap.skillId),
-          skill: { id: parseInt(gap.skillId), name: '', description: '', categoryId: '', demandLevel: 0 },
-          currentLevel: 'beginner',
-          requiredLevel: 'intermediate',
-          currentScore: 0,
-          requiredScore: 0,
-          gapScore: gap.gapScore,
-          severity: gap.severity as 'low' | 'medium' | 'high',
-          priority: gap.priority,
-        })));
-
-        // Fetch career recommendations
-        const careerData = await careerApi.getRecommendations();
-        setCareerMatches(careerData.recommendations);
-
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError('Failed to load dashboard data. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, []);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const avgSkillScore = userSkills.length > 0
     ? Math.round(userSkills.reduce((sum, s) => sum + s.score, 0) / userSkills.length)
@@ -61,21 +36,24 @@ export default function Dashboard() {
   const topMatch = careerMatches[0];
   const uniqueGapCount = [...new Set(allGaps.map(g => g.skillId))].length;
 
-  if (loading) {
+  // Calculate learning progress from learning path
+  const learningProgress = learningPath ? (learningPath.progress || 0) : 0;
+  const hasLearningPath = learningPath !== null;
+  const isPathCompleted = learningProgress === 100;
+
+  const isLoading = isLoadingSkills || isLoadingCareers;
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshCareerMatches();
+    // Trigger a page reload to get fresh data from all sources
+    window.location.reload();
+  };
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()}>Retry</Button>
-        </div>
       </div>
     );
   }
@@ -91,6 +69,15 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-3">
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Refresh dashboard data"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
           <Button variant="outline" asChild>
             <Link to="/skill_selection">
               <Target className="w-4 h-4 mr-2" />
@@ -106,6 +93,13 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Debug Info - Remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="p-3 bg-muted/50 rounded-lg text-xs font-mono">
+          <p>Debug: userSkills={userSkills.length}, careerMatches={careerMatches.length}, learningPath={learningPath ? 'yes' : 'no'}</p>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -113,7 +107,7 @@ export default function Dashboard() {
           value={`${avgSkillScore}%`}
           subtitle={`${userSkills.length} skills assessed`}
           icon={Target}
-          trend={{ value: 8, isPositive: true }}
+          trend={avgSkillScore > 0 ? { value: Math.min(avgSkillScore, 100), isPositive: true } : undefined}
         />
         <StatCard
           title="Skill Gaps"
@@ -125,28 +119,55 @@ export default function Dashboard() {
         <StatCard
           title="Best Career Match"
           value={topMatch?.matchScore ? `${topMatch.matchScore}%` : '-'}
-          subtitle={topMatch?.role.title || 'Complete assessment'}
+          subtitle={topMatch?.title || topMatch?.role?.title || 'Complete assessment'}
           icon={Briefcase}
           iconClassName="bg-success/10"
         />
         <StatCard
           title="Learning Progress"
-          value="0%"
-          subtitle="Start a learning path"
+          value={`${learningProgress}%`}
+          subtitle={hasLearningPath 
+            ? (isPathCompleted ? "Path completed!" : `${learningPath?.steps?.filter(s => s.isCompleted).length || 0} of ${learningPath?.steps?.length || 0} steps completed`)
+            : "Start a learning path"}
           icon={GraduationCap}
           iconClassName="bg-accent/10"
+          trend={learningProgress > 0 ? { value: learningProgress, isPositive: true } : undefined}
         />
+      </div>
+
+      {/* Quick Actions Row */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <QuickActions />
+        </div>
+        <WeeklyGoals />
+      </div>
+
+      {/* Stats & Progress Row */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <SkillProgressChart />
+        </div>
+        <LearningPathCard />
       </div>
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
         <SkillsOverview />
-        <TopGaps />
+        <CompletedAssessments />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <TopGaps />
         <CareerMatches />
-        <RecentActivity />
+      </div>
+
+      {/* Achievements & Activity Row */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <RecentActivity />
+        </div>
+        <Achievements />
       </div>
     </div>
   );

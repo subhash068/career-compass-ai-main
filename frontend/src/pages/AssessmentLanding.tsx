@@ -38,8 +38,10 @@ export default function AssessmentLanding() {
 
         // Get selected skills from session storage or API
         const selectedSkillsData = sessionStorage.getItem('selectedSkills');
+        let loadedSkills: Skill[] = [];
         if (selectedSkillsData) {
-          setSkills(JSON.parse(selectedSkillsData));
+          loadedSkills = JSON.parse(selectedSkillsData);
+          setSkills(loadedSkills);
         } else {
           // Fallback: fetch from API
           const response = await fetch(`http://localhost:5000/api/assessment/selected-skills?assessment_id=${assessmentId}`, {
@@ -51,12 +53,17 @@ export default function AssessmentLanding() {
 
           if (response.ok) {
             const data = await response.json();
-            setSkills(data.skills);
+            loadedSkills = data.skills;
+            setSkills(loadedSkills);
             sessionStorage.setItem('selectedSkills', JSON.stringify(data.skills));
           } else {
             throw new Error('Failed to load skills');
           }
         }
+
+        // Store pending skills in localStorage for exam navigation
+        localStorage.setItem('pendingSkills', JSON.stringify(loadedSkills));
+
       } catch (error) {
         console.error('Error loading skills:', error);
         toast({
@@ -84,8 +91,13 @@ export default function AssessmentLanding() {
       return;
     }
 
-    // Navigate to exam page with skill data
-    navigate('/skill_selection/assessment/exam', {
+    // Store skill info in localStorage for exam page to access
+    localStorage.setItem('currentSkillId', skill.id.toString());
+    localStorage.setItem('currentSkillName', skill.name);
+
+    // Navigate to exam page with skill name in URL
+    const encodedSkillName = encodeURIComponent(skill.name.toLowerCase().replace(/\s+/g, '-'));
+    navigate(`/skill_selection/assessment/${encodedSkillName}`, {
       state: {
         skillId: skill.id,
         skillName: skill.name,
@@ -93,6 +105,7 @@ export default function AssessmentLanding() {
       }
     });
   };
+
 
   const getDifficultyColor = (difficulty?: string) => {
     switch (difficulty?.toLowerCase()) {

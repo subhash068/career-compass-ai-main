@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from typing import Optional
+
 
 from models.database import get_db
 from models.user import User
@@ -133,4 +135,118 @@ async def get_assessment_result(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get assessment result: {str(e)}"
+        )
+
+
+@router.delete("/delete/{skill_id}")
+async def delete_assessment(
+    skill_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Delete a skill assessment for the current user
+    """
+    try:
+        from models.skill_assessment import SkillAssessmentSkill, SkillAssessment
+        from models.user_skill import UserSkill
+        
+        # Delete from SkillAssessmentSkill (assessment records)
+        assessment_skills = db.query(SkillAssessmentSkill).join(
+            SkillAssessment
+        ).filter(
+            SkillAssessment.user_id == current_user.id,
+            SkillAssessmentSkill.skill_id == skill_id
+        ).all()
+        
+        for asm in assessment_skills:
+            db.delete(asm)
+        
+        # Delete from UserSkill (user skill records)
+        user_skills = db.query(UserSkill).filter(
+            UserSkill.user_id == current_user.id,
+            UserSkill.skill_id == skill_id
+        ).all()
+        
+        for us in user_skills:
+            db.delete(us)
+        
+        db.commit()
+        
+        return {
+            "message": f"Assessment for skill {skill_id} deleted successfully",
+            "skill_id": skill_id
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete assessment: {str(e)}"
+        )
+
+
+
+@router.get("/completed")
+async def get_completed_assessments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all completed assessments for the current user
+    """
+    try:
+        from models.skill import Skill
+        from models.skill_assessment import SkillAssessmentSkill, SkillAssessment
+        from sqlalchemy import desc, func
+        
+        # DEBUG: Log what we're fetching
+        print(f"DEBUG: Fetching completed assessments for user {current_user.id}")
+        
+        # Get latest assessment skill for each skill from skill_assessment_skills
+        # This table has the correct scores (user_skills has corrupted data)
+        subquery = db.query(
+            SkillAssessmentSkill.skill_id,
+            func.max(SkillAssessmentSkill.created_at).label('max_created_at')
+        ).join(SkillAssessment).filter(
+            SkillAssessment.user_id == current_user.id
+        ).group_by(SkillAssessmentSkill.skill_id).subquery()
+        
+        latest_assessments = db.query(SkillAssessmentSkill).join(
+            subquery,
+            and_(
+                SkillAssessmentSkill.skill_id == subquery.c.skill_id,
+                SkillAssessmentSkill.created_at == subquery.c.max_created_at
+            )
+        ).join(SkillAssessment).filter(
+            SkillAssessment.user_id == current_user.id
+        ).all()
+        
+        print(f"DEBUG: Found {len(latest_assessments)} latest assessment records")
+        for asm in latest_assessments:
+            print(f"DEBUG: AssessmentSkill - Skill {asm.skill_id}: score={asm.score}, confidence={asm.confidence}")
+        
+        # Get skill names and format response
+        result = []
+        for asm in latest_assessments:
+            skill = db.query(Skill).filter(Skill.id == asm.skill_id).first()
+            result.append({
+                "skill_id": asm.skill_id,
+                "skill_name": skill.name if skill else "Unknown Skill",
+                "score": asm.score,
+                "level": asm.level.title() if asm.level else "Beginner",
+                "confidence": asm.confidence,
+                "completed_at": asm.created_at.isoformat() if asm.created_at else None
+            })
+        
+        print(f"DEBUG: Returning {len(result)} assessments")
+        for r in result:
+            print(f"DEBUG: Response - {r['skill_name']}: score={r['score']}")
+        
+        return {"assessments": result}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get completed assessments: {str(e)}"
         )

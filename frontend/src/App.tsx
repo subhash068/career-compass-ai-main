@@ -33,6 +33,11 @@ const PrivacyPolicy = React.lazy(() => import("@/pages/PrivacyPolicy"));
 const TermsOfService = React.lazy(() => import("@/pages/TermsOfService"));
 const CookiePolicy = React.lazy(() => import("@/pages/CookiePolicy"));
 const SkillExam = React.lazy(() => import("@/pages/SkillExam"));
+const AssessmentHistory = React.lazy(() => import("@/pages/AssessmentHistory"));
+const Notes = React.lazy(() => import("@/pages/Notes"));
+const Resumes = React.lazy(() => import("@/pages/Resumes"));
+const ResumeBuilder = React.lazy(() => import("@/pages/ResumeBuilder"));
+const ATSChecker = React.lazy(() => import("@/pages/ATSChecker"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 
@@ -76,7 +81,7 @@ const App = () => (
                         <Route path="/terms" element={<TermsOfService />} />
                         <Route path="/cookies" element={<CookiePolicy />} />
                         <Route path="/skill_selection" element={<SkillSelection />} />
-                        <Route path="/skill_selection/assessment/exam" element={
+                        <Route path="/skill_selection/assessment/:skillName" element={
                           <ProtectedRoute>
                             <SkillExam />
                           </ProtectedRoute>
@@ -90,6 +95,31 @@ const App = () => (
                         <Route path="/assistant" element={<Assistant />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/settings" element={<Settings />} />
+                        <Route path="/assessment-history" element={
+                          <ProtectedRoute>
+                            <AssessmentHistory />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/notes" element={
+                          <ProtectedRoute>
+                            <Notes />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/resumes" element={
+                          <ProtectedRoute>
+                            <Resumes />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/resumes/builder" element={
+                          <ProtectedRoute>
+                            <ResumeBuilder />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/resumes/ats-checker" element={
+                          <ProtectedRoute>
+                            <ATSChecker />
+                          </ProtectedRoute>
+                        } />
                         <Route path="/admin" element={
                           <ProtectedRoute requiredRole="admin">
                             <AdminDashboard />

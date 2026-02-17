@@ -64,8 +64,12 @@ export interface JobRole {
     max: number;
     currency: string;
   };
+  average_salary_min?: number;
+  average_salary_max?: number;
   demandScore: number; // 1-100
+  demand_score?: number;
   growthRate: number; // percentage
+  growth_rate?: number;
 }
 
 export interface RoleSkillRequirement {
@@ -92,16 +96,70 @@ export interface SkillGap {
 
 export interface CareerMatch {
   roleId: number;
-  role: JobRole;
+  role?: JobRole;
+  title: string;
+  description?: string;
+  level: string;
   matchScore: number;
-  skillMatches: {
+  match_percentage?: number;
+  skillMatch?: number;
+  inferredBonus?: number;
+  confidenceLevel?: number;
+  skillMatches?: {
     matched: number;
     total: number;
     percentage: number;
   };
-  gaps: SkillGap[];
-  reasoning: string;
-  estimatedTimeToQualify: string;
+  gaps?: SkillGap[];
+  reasoning?: string;
+  explanation?: string;
+  estimatedTimeToQualify?: string;
+  estimated_time_to_qualify?: string;
+  // Skills data
+  matchedSkills?: string[];
+  missingSkills?: string[];
+  matchedCount?: number;
+  missingCount?: number;
+  totalRequirements?: number;
+  keySkills?: string[];
+  improvementPriority?: string[];
+  missingSeverity?: Array<{
+    skill_name: string;
+    gap: number;
+    effective_gap: number;
+    severity: string;
+    description: string;
+    inferred_bonus: number;
+  }>;
+  skillRequirements?: Array<{
+    skill_id: number;
+    skill_name: string;
+    required_level: string;
+    user_level: string;
+    user_score: number;
+    required_score: number;
+    gap: number;
+    weight: number;
+    is_matched: boolean;
+    severity?: string;
+    description?: string;
+  }>;
+  // Market data
+  averageSalary?: {
+    min: number;
+    max: number;
+    currency: string;
+  };
+  growthRate?: number;
+  demandScore?: number;
+  marketOutlook?: string;
+  // Metadata
+  qualityMetrics?: {
+    factors_used: number;
+    overall_confidence: number;
+    score_consistency: number;
+    method_used: string;
+  };
 }
 
 export interface LearningResource {
@@ -119,13 +177,21 @@ export interface LearningResource {
 export interface LearningPathStep {
   id: number;
   skillId: number;
-  skill: Skill;
+  skill_id?: number; // snake_case from API
+  skill?: Skill;
+  skill_name?: string; // from API when skill object not loaded
   targetLevel: SkillLevel;
+  target_level?: SkillLevel; // snake_case from API
   order: number;
   estimatedDuration: string;
+  estimated_duration?: string; // snake_case from API
   resources: LearningResource[];
   dependencies: string[]; // skill IDs
   isCompleted: boolean;
+  is_completed?: boolean; // snake_case from API
+  assessmentPassed?: boolean;
+  assessment_passed?: boolean; // snake_case from API
+  canComplete?: boolean;
 }
 
 export interface LearningPath {
@@ -228,4 +294,32 @@ export interface QuizResult {
     };
   };
   overall_score: number;
+}
+
+// Career comparison types
+export interface CareerComparison {
+  careers: CareerMatch[];
+  insights: string[];
+  bestMatch: CareerMatch | null;
+  highestSalary: CareerMatch | null;
+  bestGrowth: CareerMatch | null;
+  easiestPath: CareerMatch | null;
+}
+
+// Trending career type
+export interface TrendingCareer {
+  roleId: number;
+  title: string;
+  level: string;
+  description?: string;
+  growthRate: number;
+  demandScore: number;
+  averageSalary: {
+    min: number;
+    max: number;
+    currency: string;
+  };
+  keySkills: string[];
+  marketOutlook: string;
+  trendingScore: number;
 }

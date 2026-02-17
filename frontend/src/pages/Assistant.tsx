@@ -71,7 +71,11 @@ function generateAIResponse(message: string, context: any): string {
   if (lowerMessage.includes('career') || lowerMessage.includes('path')) {
     const topMatch = careerMatches[0];
     if (topMatch) {
-      return `Based on your skills, **${topMatch.role.title}** is your best match at ${topMatch.matchScore}%!\n\n**Why this fits you:**\n${topMatch.reasoning}\n\n**Salary range:** $${Math.round(topMatch.role.averageSalary.min/1000)}k - $${Math.round(topMatch.role.averageSalary.max/1000)}k\n**Growth rate:** +${topMatch.role.growthRate}%\n\n${topMatch.gaps.length > 0 ? `You'll need to close ${topMatch.gaps.length} skill gaps first.` : "You're already well-prepared for this role!"}`;
+      const title = topMatch.title || topMatch.role?.title || 'Unknown Role';
+      const minSalary = topMatch.averageSalary?.min || topMatch.role?.averageSalary?.min || 0;
+      const maxSalary = topMatch.averageSalary?.max || topMatch.role?.averageSalary?.max || 0;
+      const growthRate = topMatch.growthRate || topMatch.role?.growthRate || 0;
+      return `Based on your skills, **${title}** is your best match at ${topMatch.matchScore}%!\n\n**Why this fits you:**\n${topMatch.reasoning}\n\n**Salary range:** $${Math.round(minSalary/1000)}k - $${Math.round(maxSalary/1000)}k\n**Growth rate:** +${growthRate}%\n\n${topMatch.gaps?.length > 0 ? `You'll need to close ${topMatch.gaps.length} skill gaps first.` : "You're already well-prepared for this role!"}`;
     }
     return "Complete your assessment to get personalized career recommendations!";
   }

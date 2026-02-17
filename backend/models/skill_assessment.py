@@ -32,10 +32,18 @@ class SkillAssessment(Base):
         server_default=text("'completed'"),
     )
 
+    domain_id = Column(
+        Integer,
+        ForeignKey("domains.id"),
+        nullable=True,
+        index=True,
+    )
+
     completed_at = Column(
         DateTime,
         nullable=True,
     )
+
 
     created_at = Column(
         DateTime,
@@ -45,6 +53,8 @@ class SkillAssessment(Base):
 
     # Relationships
     user = relationship("User", back_populates="assessments")
+    domain = relationship("Domain")
+
 
     assessment_skills = relationship(
         "SkillAssessmentSkill",
@@ -61,14 +71,18 @@ class SkillAssessment(Base):
     __table_args__ = (
         Index("idx_skill_assessment_user_id", "user_id"),
         Index("idx_skill_assessment_created_at", "created_at"),
+        Index("idx_skill_assessment_domain_id", "domain_id"),
     )
+
 
     def to_dict(self) -> dict:
         return {
             "id": self.id,
             "user_id": self.user_id,
             "status": self.status,
+            "domain_id": self.domain_id,
             "skills": [
+
                 {
                     "skill_id": s.skill_id,
                     "level": s.level,

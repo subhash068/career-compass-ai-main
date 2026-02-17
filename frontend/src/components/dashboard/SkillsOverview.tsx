@@ -1,5 +1,4 @@
 import { useApp } from '@/contexts/AppContext';
-import { skillCategories, skills } from '@/lib/mock-data';
 import {
   RadarChart,
   PolarGrid,
@@ -12,6 +11,16 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+
+// Default categories if API doesn't provide them
+const defaultCategories = [
+  { id: 'technical', name: 'Technical' },
+  { id: 'soft', name: 'Soft Skills' },
+  { id: 'business', name: 'Business' },
+  { id: 'creative', name: 'Creative' },
+  { id: 'analytical', name: 'Analytical' },
+  { id: 'leadership', name: 'Leadership' },
+];
 
 export function SkillsOverview() {
   const { userSkills, isLoadingSkills } = useApp();
@@ -27,16 +36,19 @@ export function SkillsOverview() {
   ];
 
   // Aggregate skills by category for radar chart
-  const categoryData = skillCategories.slice(0, 6).map((cat, index) => {
-    const categorySkills = userSkills.filter(us => {
-      const skill = skills.find(s => s.id === us.skillId);
-      return skill?.categoryId === cat.id;
+  // Handle both old and new API formats
+  const categoryData = defaultCategories.map((cat, index) => {
+    const categorySkills = userSkills.filter((us: any) => {
+      const skillCategory = us.skill?.category_id || us.skill?.categoryId || us.category_id || 'technical';
+      return skillCategory === cat.id;
     });
+    
     const avgScore = categorySkills.length > 0
-      ? Math.round(categorySkills.reduce((sum, s) => sum + s.score, 0) / categorySkills.length)
+      ? Math.round(categorySkills.reduce((sum, s) => sum + (s.score || 0), 0) / categorySkills.length)
       : 0;
+      
     return {
-      category: cat.name.split(' ')[0], // Shorten name
+      category: cat.name,
       score: avgScore,
       fullMark: 100,
       color: categoryColors[index % categoryColors.length],

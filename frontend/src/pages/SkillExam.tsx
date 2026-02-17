@@ -22,17 +22,19 @@ interface Question {
 export default function SkillExam() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { skillName: urlSkillNameParam } = useParams<{ skillName: string }>();
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
 
-  // Get skill data from navigation state or URL params
+  // Get skill data from URL param, navigation state, URL search params, or localStorage
   const urlParams = new URLSearchParams(window.location.search);
   const urlSkillId = urlParams.get('skillId');
   const urlSkillName = urlParams.get('skillName');
   
-  // Try to get from navigation state first, then URL params, then localStorage
-  const skillName = location.state?.skillName || urlSkillName || localStorage.getItem('currentSkillName') || 'Unknown Skill';
+  // Try to get from URL param first, then navigation state, then URL search params, then localStorage
+  const skillName = urlSkillNameParam || location.state?.skillName || urlSkillName || localStorage.getItem('currentSkillName') || 'Unknown Skill';
   const initialSkillId = location.state?.skillId || (urlSkillId ? parseInt(urlSkillId) : null) || (localStorage.getItem('currentSkillId') ? parseInt(localStorage.getItem('currentSkillId')!) : null);
+
 
 
 
@@ -46,6 +48,20 @@ export default function SkillExam() {
   const [results, setResults] = useState<any>(null);
   const [skillId, setSkillId] = useState<number | null>(initialSkillId);
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+  const [nextSkill, setNextSkill] = useState<{id: number, name: string} | null>(null);
+
+  // Reset state when URL parameter changes (for next exam navigation)
+  useEffect(() => {
+    setSkillId(initialSkillId);
+    setExamComplete(false);
+    setResults(null);
+    setCurrentQuestion(0);
+    setAnswers({});
+    setWrittenAnswer('');
+    setNextSkill(null);
+    setLoading(true);
+    window.scrollTo(0, 0);
+  }, [urlSkillNameParam, initialSkillId]);
 
   // Store skill info in localStorage when available
   useEffect(() => {
@@ -54,6 +70,7 @@ export default function SkillExam() {
       localStorage.setItem('currentSkillName', skillName);
     }
   }, [skillId, skillName]);
+
 
 
   // Format time
@@ -87,6 +104,11 @@ export default function SkillExam() {
 
         setSkillId(currentSkillId);
 
+        // DEBUG: Log the values being used
+        console.log('DEBUG: Loading exam with skillId:', currentSkillId);
+        console.log('DEBUG: skillName:', skillName);
+        console.log('DEBUG: Auth token exists:', !!localStorage.getItem('authToken'));
+        console.log('DEBUG: User:', user);
 
         // Load quiz from new API
         const response = await fetch(`http://localhost:5000/api/assessment/start/${currentSkillId}`, {
@@ -97,8 +119,11 @@ export default function SkillExam() {
         });
 
         if (!response.ok) {
-          throw new Error('Failed to load quiz');
+          const errorText = await response.text();
+          console.error(`API Error ${response.status}:`, errorText);
+          throw new Error(`Failed to load quiz: ${response.status} - ${errorText}`);
         }
+
 
         const data = await response.json();
 
@@ -227,14 +252,34 @@ export default function SkillExam() {
       setResults(result);
       setExamComplete(true);
 
+      // Trigger dashboard refresh
+      window.dispatchEvent(new CustomEvent('assessmentCompleted', { 
+        detail: { skillId, skillName, score: result.score } 
+      }));
+      localStorage.setItem('lastAssessmentCompleted', Date.now().toString());
+
       // Clear localStorage after successful submission
       localStorage.removeItem('currentSkillId');
       localStorage.removeItem('currentSkillName');
+
+
+      // Get next skill from localStorage (set during skill selection)
+      const pendingSkillsJson = localStorage.getItem('pendingSkills');
+      if (pendingSkillsJson) {
+        const pendingSkills = JSON.parse(pendingSkillsJson);
+        // Find current skill index and get next one
+        const currentIndex = pendingSkills.findIndex((s: any) => s.id === skillId);
+        if (currentIndex !== -1 && currentIndex < pendingSkills.length - 1) {
+          const next = pendingSkills[currentIndex + 1];
+          setNextSkill({ id: next.id, name: next.name });
+        }
+      }
 
       toast({
         title: "Exam Completed!",
         description: `You scored ${score.toFixed(1)}% - ${level} level`,
       });
+
 
     } catch (error) {
       console.error('Error submitting exam:', error);
@@ -253,7 +298,36 @@ export default function SkillExam() {
     submitExam();
   };
 
+  const startNextExam = () => {
+    if (!nextSkill) return;
+    
+    // Update localStorage to remove current skill from pending
+    const pendingSkillsJson = localStorage.getItem('pendingSkills');
+    if (pendingSkillsJson) {
+      const pendingSkills = JSON.parse(pendingSkillsJson);
+      const updatedSkills = pendingSkills.filter((s: any) => s.id !== skillId);
+      localStorage.setItem('pendingSkills', JSON.stringify(updatedSkills));
+    }
+
+    // Store next skill info in localStorage before navigation
+    localStorage.setItem('currentSkillId', nextSkill.id.toString());
+    localStorage.setItem('currentSkillName', nextSkill.name);
+
+    // Navigate to next exam using skill name in URL
+    const encodedSkillName = encodeURIComponent(nextSkill.name.toLowerCase().replace(/\s+/g, '-'));
+    navigate(`/skill_selection/assessment/${encodedSkillName}`, {
+      state: { 
+        skillId: nextSkill.id, 
+        skillName: nextSkill.name 
+      }
+    });
+
+  };
+
+
   const allAnswered = questions.length > 0 && questions.every(q => answers[q.id]);
+
+
 
   if (loading || isAuthLoading) {
     return (
@@ -302,15 +376,25 @@ export default function SkillExam() {
               </div>
             )}
 
-            <div className="flex justify-center gap-4">
+            <div className="flex justify-center gap-4 flex-wrap">
               <Button onClick={() => navigate('/skill_selection/assessment')} variant="outline">
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Back to Assessments
               </Button>
+              {nextSkill && (
+                <Button 
+                  onClick={() => startNextExam()} 
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Next: {nextSkill.name}
+                  <ChevronLeft className="w-4 h-4 ml-2 rotate-180" />
+                </Button>
+              )}
               <Button onClick={() => navigate('/dashboard')}>
                 Go to Dashboard
               </Button>
             </div>
+
           </CardContent>
         </Card>
       </div>

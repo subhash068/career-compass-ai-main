@@ -10,8 +10,11 @@ from sqlalchemy.orm import Session
 from models.user_skill import UserSkill
 from models.skill import Skill
 from models.skill_assessment import SkillAssessment, SkillAssessmentSkill
+from models.job_role import JobRole
+from models.role_skill_requirement import RoleSkillRequirement
 from ai.skill_similarity import SkillSimilarity
 from ai.skill_inference import SkillInference
+
 
 
 class SkillsService:
@@ -220,30 +223,60 @@ class SkillsService:
         db: Session,
         user_id: int
     ) -> Dict[str, Any]:
-        # Get user skills
-        user_skills = (
-            db.query(UserSkill)
-            .filter_by(user_id=user_id)
-            .all()
-        )
+        # Get latest skill assessment scores from SkillAssessmentSkill table
+        # This table has correct scores (percentages), unlike UserSkill which has corrupted data
+        from sqlalchemy import func, and_
+        from models.skill_assessment import SkillAssessmentSkill, SkillAssessment
+        
+        print(f"[DEBUG] analyze_skills called for user {user_id}")
+        
+        # Get the latest assessment for each skill using a proper subquery
+        # that gets only the most recent record per skill
+        subquery = db.query(
+            SkillAssessmentSkill.skill_id,
+            func.max(SkillAssessmentSkill.id).label('max_id')
+        ).join(SkillAssessment).filter(
+            SkillAssessment.user_id == user_id
+        ).group_by(SkillAssessmentSkill.skill_id).subquery()
+        
+        latest_assessments = db.query(SkillAssessmentSkill).join(
+            subquery,
+            SkillAssessmentSkill.id == subquery.c.max_id
+        ).all()
+        
+        print(f"[DEBUG] Found {len(latest_assessments)} latest assessment records")
+        for asm in latest_assessments:
+            skill_name = asm.skill.name if asm.skill else f"Skill {asm.skill_id}"
+            print(f"[DEBUG] AssessmentSkill - {skill_name}: score={asm.score}, level={asm.level}")
 
-        if not user_skills:
-            return {
-                "user_id": user_id,
-                "message": "No skills found for analysis",
-                "insights": {},
-                "skills": [],
-                "gaps": [],
-                "recommendations": []
-            }
-
-        # Apply AI enhancements (with fallback)
-        enhanced_skills = []
-        try:
-            enhanced_skills = SkillsService._apply_ai_enhancements(db, user_skills)
-        except Exception as e:
-            print(f"AI enhancement failed, using basic skills: {e}")
+        # Use assessment skills if found, otherwise fallback to UserSkill
+        if latest_assessments:
+            print("[DEBUG] Using assessment skills with correct scores")
+            enhanced_skills = latest_assessments
+            user_skills = latest_assessments  # For counting in response
+        else:
+            # Fallback to UserSkill if no assessments found
+            print("[DEBUG] No assessment records found, falling back to UserSkill")
+            user_skills = (
+                db.query(UserSkill)
+                .filter_by(user_id=user_id)
+                .all()
+            )
+            
+            if not user_skills:
+                return {
+                    "user_id": user_id,
+                    "message": "No skills found for analysis",
+                    "insights": {},
+                    "skills": [],
+                    "gaps": [],
+                    "recommendations": []
+                }
+            
+            # Convert UserSkill objects to match the expected format
             enhanced_skills = user_skills
+
+
 
         # Detect hidden/inferred skills (with fallback)
         inferred_skills = []
@@ -257,18 +290,32 @@ class SkillsService:
         # Generate insights
         insights = SkillsService._generate_skill_insights(enhanced_skills, inferred_skills)
 
+        # Calculate detailed skill gaps based on job role requirements
+        detailed_gaps = SkillsService._calculate_skill_gaps(db, enhanced_skills)
+
         # Format skills for frontend
         skills_data = []
-        for user_skill in enhanced_skills:
+        for skill_record in enhanced_skills:
+            # Handle both UserSkill and SkillAssessmentSkill objects
+            skill_name = skill_record.skill.name if skill_record.skill else f"Skill {skill_record.skill_id}"
+            category = skill_record.skill.category if skill_record.skill else None
+            
+            # Get assessed_at - different fields for different models
+            if hasattr(skill_record, 'assessed_at'):
+                assessed_at = skill_record.assessed_at.isoformat() if skill_record.assessed_at else None
+            else:
+                assessed_at = skill_record.created_at.isoformat() if skill_record.created_at else None
+            
             skills_data.append({
-                "skill_id": user_skill.skill_id,
-                "skill_name": user_skill.skill.name,
-                "category": user_skill.skill.category,
-                "score": user_skill.score,
-                "confidence": user_skill.confidence,
-                "level": user_skill.level,
-                "assessed_at": user_skill.assessed_at.isoformat() if user_skill.assessed_at else None,
+                "skill_id": skill_record.skill_id,
+                "skill_name": skill_name,
+                "category": category,
+                "score": skill_record.score,
+                "confidence": skill_record.confidence,
+                "level": skill_record.level,
+                "assessed_at": assessed_at,
             })
+
 
         return {
             "user_id": user_id,
@@ -277,12 +324,13 @@ class SkillsService:
             "insights": insights,
             "skill_breakdown": {
                 "strengths": insights["strengths"],
-                "gaps": insights["gaps"],
+                "gaps": [gap["skill"]["name"] for gap in detailed_gaps],
             },
             "skills": skills_data,
-            "gaps": insights["gaps"],
+            "gaps": detailed_gaps,
             "recommendations": insights["recommendations"]
         }
+
 
     # -----------------------------------------------------
     # FIND SIMILAR SKILLS (TF-IDF)
@@ -407,6 +455,224 @@ class SkillsService:
             ]
 
         return insights
+
+    @staticmethod
+    def _calculate_skill_gaps(
+        db: Session,
+        user_skills: List[UserSkill]
+    ) -> List[Dict[str, Any]]:
+        """
+        Calculate detailed skill gaps by comparing user skills against job role requirements.
+        Returns list of gap objects with scores, levels, and severity.
+        Shows ALL user skills, not just those matching job requirements.
+        """
+        print(f"[DEBUG] _calculate_skill_gaps called with {len(user_skills)} user skills")
+        
+        if not user_skills:
+            print("[DEBUG] No user skills found, returning empty gaps")
+            return []
+
+        # Build user skill map for quick lookup
+        user_skill_map = {us.skill_id: us for us in user_skills}
+        print(f"[DEBUG] User skill map: {list(user_skill_map.keys())}")
+
+        # Get all job roles and their requirements
+        try:
+            roles = db.query(JobRole).all()
+            print(f"[DEBUG] Found {len(roles)} job roles")
+        except Exception as e:
+            print(f"[ERROR] Failed to query job roles: {e}")
+            roles = []
+
+        # Collect all skill requirements from all roles
+        all_requirements = {}
+        for role in roles:
+            try:
+                requirements = db.query(RoleSkillRequirement).filter_by(role_id=role.id).all()
+                print(f"[DEBUG] Role '{role.title}' (ID: {role.id}) has {len(requirements)} requirements")
+                for req in requirements:
+                    # Store the highest required level for each skill
+                    if req.skill_id not in all_requirements:
+                        all_requirements[req.skill_id] = req.required_level
+                    else:
+                        # Keep the higher level requirement
+                        current_level = all_requirements[req.skill_id]
+                        level_scores = {"beginner": 1, "intermediate": 2, "advanced": 3, "expert": 4}
+                        if level_scores.get(req.required_level, 0) > level_scores.get(current_level, 0):
+                            all_requirements[req.skill_id] = req.required_level
+            except Exception as e:
+                print(f"[ERROR] Failed to query requirements for role {role.id}: {e}")
+                continue
+
+        print(f"[DEBUG] Total unique skill requirements collected: {len(all_requirements)}")
+
+        # Create gaps for ALL user skills
+        gaps = []
+        
+        for user_skill in user_skills:
+            skill_id = user_skill.skill_id
+            current_score = user_skill.score
+            current_level = SkillsService._score_to_level(current_score)
+            
+            # Determine required level: use job requirement if exists, otherwise default to "advanced"
+            if skill_id in all_requirements:
+                required_level = all_requirements[skill_id]
+            else:
+                required_level = "advanced"  # Default target level
+            
+            required_score = SkillsService._level_to_score(required_level)
+            
+            # Calculate gap
+            gap_score = required_score - current_score
+            
+            # Determine severity and priority
+            if gap_score > 50:
+                severity = "high"
+                priority = 10
+            elif gap_score > 25:
+                severity = "medium"
+                priority = 7
+            elif gap_score > 5:
+                severity = "low"
+                priority = 4
+            else:
+                # Skill meets or exceeds target
+                severity = "none"
+                priority = 0
+                gap_score = 0  # No gap
+
+            # Get skill details
+            try:
+                skill = db.query(Skill).filter_by(id=skill_id).first()
+                if skill:
+                    gaps.append({
+                        "skillId": str(skill_id),
+                        "skill": {
+                            "id": str(skill_id),
+                            "name": skill.name,
+                            "description": skill.description or "",
+                            "categoryId": skill.domain_id if skill.domain_id else None,
+                            "demandLevel": 5  # Default demand level
+                        },
+                        "currentLevel": current_level,
+                        "requiredLevel": required_level,
+                        "currentScore": current_score,
+                        "requiredScore": required_score,
+                        "gapScore": gap_score,
+                        "severity": severity,
+                        "priority": priority
+                    })
+
+                    print(f"[DEBUG] Added skill '{skill.name}': current={current_score:.1f}%, required={required_score}%, gap={gap_score:.1f}, severity={severity}")
+            except Exception as e:
+                print(f"[ERROR] Failed to get skill details for skill_id {skill_id}: {e}")
+                continue
+
+        # Sort by priority (highest first), then by gap score (highest first)
+        # This puts real gaps first, completed skills last
+        gaps.sort(key=lambda x: (-x["priority"], -x["gapScore"]))
+        print(f"[DEBUG] Returning {len(gaps)} skills total (including {len([g for g in gaps if g['severity'] == 'none'])} complete skills)")
+
+        return gaps
+
+    @staticmethod
+    def _create_default_gaps(
+        db: Session,
+        user_skills: List[UserSkill]
+    ) -> List[Dict[str, Any]]:
+        """
+        Create default gaps when no job role requirements exist.
+        Assumes user should aim for 'advanced' level (75) for all their skills.
+        Shows ALL skills, including those that meet the target.
+        """
+        print(f"[DEBUG] _create_default_gaps called with {len(user_skills)} skills")
+        gaps = []
+        
+        for user_skill in user_skills:
+            # Use score directly - should be 0-100 percentage
+            current_score = user_skill.score
+            required_score = 75  # Target: advanced level
+            
+            # Calculate gap (can be 0 or negative if user exceeds target)
+            gap_score = required_score - current_score
+            
+            try:
+                skill = db.query(Skill).filter_by(id=user_skill.skill_id).first()
+                if skill:
+                    if gap_score > 5:  # Real gap - needs improvement
+                        # Determine severity based on gap
+                        if gap_score > 50:
+                            severity = "high"
+                            priority = 10
+                        elif gap_score > 25:
+                            severity = "medium"
+                            priority = 7
+                        else:
+                            severity = "low"
+                            priority = 4
+                        
+                        gaps.append({
+                            "skillId": str(user_skill.skill_id),
+                            "skill": {
+                                "id": str(user_skill.skill_id),
+                                "name": skill.name,
+                                "description": skill.description or "",
+                                "categoryId": str(skill.domain_id) if skill.domain_id else "",
+                                "demandLevel": 5
+                            },
+                            "currentLevel": SkillsService._score_to_level(current_score),
+                            "requiredLevel": "advanced",
+                            "currentScore": current_score,
+                            "requiredScore": required_score,
+                            "gapScore": gap_score,
+                            "severity": severity,
+                            "priority": priority
+                        })
+                        print(f"[DEBUG] Added gap for skill '{skill.name}': current={current_score:.1f}%, target={required_score}%, gap={gap_score:.1f}")
+                    else:
+                        # Skill meets or exceeds target - show as "complete" or "no gap"
+                        # Use negative priority to sort these at the bottom
+                        gaps.append({
+                            "skillId": str(user_skill.skill_id),
+                            "skill": {
+                                "id": str(user_skill.skill_id),
+                                "name": skill.name,
+                                "description": skill.description or "",
+                                "categoryId": str(skill.domain_id) if skill.domain_id else "",
+                                "demandLevel": 5
+                            },
+                            "currentLevel": SkillsService._score_to_level(current_score),
+                            "requiredLevel": "advanced",
+                            "currentScore": current_score,
+                            "requiredScore": required_score,
+                            "gapScore": 0,  # No gap
+                            "severity": "none",  # No severity - skill is complete
+                            "priority": 0  # Lowest priority - skill is complete
+                        })
+                        print(f"[DEBUG] Added complete skill '{skill.name}': current={current_score:.1f}% >= {required_score}% - NO GAP")
+            except Exception as e:
+                print(f"[ERROR] Failed to create gap for skill {user_skill.skill_id}: {e}")
+                continue
+        
+        # Sort by priority (highest first), then by gap score (highest first)
+        # This puts real gaps first, completed skills last
+        gaps.sort(key=lambda x: (-x["priority"], -x["gapScore"]))
+        print(f"[DEBUG] Returning {len(gaps)} skills total (including {len([g for g in gaps if g['severity'] == 'none'])} complete skills)")
+        return gaps
+
+    @staticmethod
+    def _score_to_level(score: float) -> str:
+        """
+        Convert numerical score to skill level.
+        """
+        if score >= 87.5:
+            return "expert"
+        elif score >= 62.5:
+            return "advanced"
+        elif score >= 37.5:
+            return "intermediate"
+        else:
+            return "beginner"
 
     # -----------------------------------------------------
     # GET QUIZ QUESTIONS FOR SKILLS

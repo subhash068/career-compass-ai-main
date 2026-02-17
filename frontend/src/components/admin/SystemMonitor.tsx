@@ -54,8 +54,9 @@ interface SystemMetrics {
     memory_percent: number;
     status: string;
   }>;
-  uptime_seconds: number;
+  uptime: string;
 }
+
 
 interface ServiceStatus {
   services: Array<{
@@ -75,10 +76,15 @@ export default function SystemMonitor() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [metricsHistory, setMetricsHistory] = useState<Array<{ time: string; cpu: number; memory: number }>>([]);
 
+  // Initial data fetch
   useEffect(() => {
     fetchData();
+  }, []);
+
+  // Auto-refresh interval management
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
     
-    let interval: NodeJS.Timeout;
     if (autoRefresh) {
       interval = setInterval(fetchData, 5000); // Refresh every 5 seconds
     }
@@ -87,6 +93,7 @@ export default function SystemMonitor() {
       if (interval) clearInterval(interval);
     };
   }, [autoRefresh]);
+
 
   const fetchData = async () => {
     try {
@@ -120,17 +127,8 @@ export default function SystemMonitor() {
     }
   };
 
-  const formatUptime = (seconds: number) => {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    
-    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-  };
-
   const formatBytes = (bytes: number) => {
+
     if (bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -176,13 +174,14 @@ export default function SystemMonitor() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button
-            variant="outline"
+            variant={autoRefresh ? "default" : "outline"}
             size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+            <RefreshCw className="h-4 w-4 mr-2" />
             {autoRefresh ? 'Auto-refresh On' : 'Auto-refresh Off'}
           </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -195,8 +194,9 @@ export default function SystemMonitor() {
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
-            Uptime: {metrics && formatUptime(metrics.uptime_seconds)}
+            Uptime: {metrics?.uptime || 'N/A'}
           </span>
+
         </div>
       </div>
 

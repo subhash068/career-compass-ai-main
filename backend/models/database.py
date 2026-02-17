@@ -78,15 +78,23 @@ class RedisConnection:
 
     def connect(self):
         if self._redis_client is None:
-            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
             try:
-                client = redis.from_url(redis_url, socket_connect_timeout=5)
+                client = redis.Redis(
+                    host='redis-19426.c239.us-east-1-2.ec2.cloud.redislabs.com',
+                    port=19426,
+                    decode_responses=True,
+                    username="default",
+                    password="8cWErxIfAC2l8PjEAfYLLp339h6Ekv2m",
+                    socket_connect_timeout=5
+                )
                 client.ping()
                 self._redis_client = client
+                print("[INFO] Redis Cloud connected successfully")
             except Exception as e:
                 print(f"[WARN] Redis unavailable: {e}")
                 self._redis_client = None
         return self._redis_client
+
 
 
 redis_client = RedisConnection()

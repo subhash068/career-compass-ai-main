@@ -31,7 +31,17 @@ class SkillQuestion(Base):
         server_default=text("'medium'"),
     )
 
+    explanation = Column(Text, nullable=True)
+
+    question_type = Column(
+        String(50),
+        nullable=False,
+        server_default=text("'multiple_choice'"),
+    )
+
     created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+
     updated_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
     # Relationships
@@ -68,10 +78,14 @@ class SkillQuestion(Base):
             "id": self.id,
             "skill_id": self.skill_id,
             "question_text": self.question_text,
+            "question_type": self.question_type,
             "options": self.get_options(),
             "correct_answer": self.correct_answer,
             "difficulty": self.difficulty,
+            "explanation": self.explanation,
         }
+
+
 
     @classmethod
     def find_by_skill(cls, db, skill_id):

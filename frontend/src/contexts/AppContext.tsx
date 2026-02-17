@@ -7,12 +7,13 @@ import type {
   SkillGap
 } from '@/types';
 import {
-  sampleUserSkills,
   calculateCareerMatches,
   generateLearningPath,
   enrichUserSkills
 } from '@/lib/mock-data';
-import { api } from '@/lib/api';
+import { skillsApi } from '@/api/skills.api';
+import { careerApi } from '@/api/career.api';
+import { learningApi } from '@/api/learning.api';
 
 interface AppContextType {
   // User skills
@@ -56,12 +57,12 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [userSkills, setUserSkillsState] = useState<UserSkill[]>(enrichUserSkills(sampleUserSkills));
-  const [careerMatches, setCareerMatches] = useState<CareerMatch[]>(() => calculateCareerMatches(sampleUserSkills));
+  const [userSkills, setUserSkillsState] = useState<UserSkill[]>([]);
+  const [careerMatches, setCareerMatches] = useState<any[]>([]);
   const [selectedCareer, setSelectedCareer] = useState<CareerMatch | null>(null);
   const [learningPath, setLearningPath] = useState<LearningPath | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [isAssessmentComplete, setIsAssessmentComplete] = useState(true);
+  const [isAssessmentComplete, setIsAssessmentComplete] = useState(false);
 
   // Theme state
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -70,54 +71,144 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   // Loading states
-  const [isLoadingSkills, setIsLoadingSkills] = useState(false);
-  const [isLoadingCareers, setIsLoadingCareers] = useState(false);
+  const [isLoadingSkills, setIsLoadingSkills] = useState(true);
+  const [isLoadingCareers, setIsLoadingCareers] = useState(true);
   const [isLoadingLearning, setIsLoadingLearning] = useState(false);
 
-  // Load user skills from database on login
+  // Load user skills from API on mount
   useEffect(() => {
     const loadUserSkills = async () => {
       const token = localStorage.getItem('authToken');
-      const user = localStorage.getItem('user');
+      if (!token) {
+        setIsLoadingSkills(false);
+        return;
+      }
 
-      if (token && user) {
-        setIsLoadingSkills(true);
-        try {
-          const response = await api.getUserSkills(token) as { data?: { skills: any[] } };
-          if (response.data?.skills && response.data.skills.length > 0) {
-            const enrichedSkills = enrichUserSkills(response.data.skills.map((skill: any) => ({
-              id: skill.id,
-              userId: skill.user_id,
-              skillId: 'skill-' + skill.skill_id.toString(),
-              level: skill.level,
-              confidence: skill.confidence,
-              score: skill.score,
-              assessedAt: new Date(skill.assessed_at),
-              version: skill.version,
-            })));
-            setUserSkillsState(enrichedSkills);
-            setCareerMatches(calculateCareerMatches(enrichedSkills));
-          }
-        } catch (error) {
-          console.error('Failed to load user skills:', error);
-        } finally {
-          setIsLoadingSkills(false);
+      setIsLoadingSkills(true);
+      try {
+        const response = await skillsApi.getUserSkills();
+        const skillsData = response.data?.skills || [];
+        
+        if (skillsData.length > 0) {
+          const enrichedSkills = enrichUserSkills(skillsData.map((skill: any) => ({
+            id: skill.id,
+            userId: skill.user_id,
+            skillId: skill.skill_id,
+            level: skill.level,
+            confidence: skill.confidence,
+            score: skill.score,
+            assessedAt: new Date(skill.assessed_at || skill.created_at),
+            version: skill.version || 1,
+          })));
+          setUserSkillsState(enrichedSkills);
+          setIsAssessmentComplete(true);
+        } else {
+          setUserSkillsState([]);
+          setIsAssessmentComplete(false);
         }
+      } catch (error) {
+        console.error('Failed to load user skills:', error);
+        setUserSkillsState([]);
+      } finally {
+        setIsLoadingSkills(false);
       }
     };
 
     loadUserSkills();
   }, []);
 
+  // Load career matches from API
+  useEffect(() => {
+    const loadCareerMatches = async () => {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setIsLoadingCareers(false);
+        return;
+      }
+
+      setIsLoadingCareers(true);
+      try {
+        const response = await careerApi.getRecommendations();
+        const careerData = response.recommendations || [];
+        setCareerMatches(careerData);
+      } catch (error) {
+        console.error('Failed to load career matches:', error);
+        setCareerMatches([]);
+      } finally {
+        setIsLoadingCareers(false);
+      }
+    };
+
+    loadCareerMatches();
+  }, []);
+
+  // Load learning path from API
+  useEffect(() => {
+    const loadLearningPath = async () => {
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+
+      setIsLoadingLearning(true);
+      try {
+        const path = await learningApi.getPath();
+        setLearningPath(path);
+      } catch (error) {
+        console.error('Failed to load learning path:', error);
+        setLearningPath(null);
+      } finally {
+        setIsLoadingLearning(false);
+      }
+    };
+
+    loadLearningPath();
+  }, []);
+
+  // Listen for assessment completion and refresh data
+  useEffect(() => {
+    const handleAssessmentComplete = () => {
+      console.log('Assessment completed - refreshing dashboard data...');
+      // Refresh all data
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+
+      // Refresh user skills
+      skillsApi.getUserSkills().then(response => {
+        const skillsData = response.data?.skills || [];
+        if (skillsData.length > 0) {
+          const enrichedSkills = enrichUserSkills(skillsData.map((skill: any) => ({
+            id: skill.id,
+            userId: skill.user_id,
+            skillId: skill.skill_id,
+            level: skill.level,
+            confidence: skill.confidence,
+            score: skill.score,
+            assessedAt: new Date(skill.assessed_at || skill.created_at),
+            version: skill.version || 1,
+          })));
+          setUserSkillsState(enrichedSkills);
+          setIsAssessmentComplete(true);
+        }
+      }).catch(err => console.error('Failed to refresh skills:', err));
+
+      // Refresh career matches
+      careerApi.getRecommendations().then(response => {
+        const careerData = response.recommendations || [];
+        setCareerMatches(careerData);
+      }).catch(err => console.error('Failed to refresh career matches:', err));
+    };
+
+    window.addEventListener('assessmentCompleted', handleAssessmentComplete);
+    return () => window.removeEventListener('assessmentCompleted', handleAssessmentComplete);
+  }, []);
+
   const setUserSkills = useCallback((skills: UserSkill[]) => {
     setUserSkillsState(enrichUserSkills(skills));
-    setCareerMatches(calculateCareerMatches(skills));
   }, []);
 
   const updateSkill = useCallback((skillId: string, level: string, confidence: number) => {
     setUserSkillsState(prev => {
       const updated = prev.map(s => 
-        s.skillId === skillId 
+        s.skillId.toString() === skillId 
           ? { ...s, level: level as UserSkill['level'], confidence, score: getScoreFromLevel(level, confidence) }
           : s
       );
@@ -126,31 +217,65 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const refreshCareerMatches = useCallback(() => {
-    setCareerMatches(calculateCareerMatches(userSkills));
-  }, [userSkills]);
-
-  const generatePath = useCallback((roleId: string) => {
-    const path = generateLearningPath(userSkills, roleId);
-    setLearningPath(path);
-  }, [userSkills]);
-
-  const markStepComplete = useCallback((stepId: string) => {
-    setLearningPath(prev => {
-      if (!prev) return null;
-      const updatedSteps = prev.steps.map(s => 
-        s.id === stepId ? { ...s, isCompleted: true } : s
-      );
-      const completedCount = updatedSteps.filter(s => s.isCompleted).length;
-      return {
-        ...prev,
-        steps: updatedSteps,
-        progress: Math.round((completedCount / updatedSteps.length) * 100),
-      };
-    });
+  const refreshCareerMatches = useCallback(async () => {
+    setIsLoadingCareers(true);
+    try {
+      const response = await careerApi.getRecommendations();
+      const careerData = response.recommendations || [];
+      setCareerMatches(careerData);
+    } catch (error) {
+      console.error('Failed to refresh career matches:', error);
+    } finally {
+      setIsLoadingCareers(false);
+    }
   }, []);
 
-  const allGaps = careerMatches.flatMap(m => m.gaps);
+  const generatePath = useCallback(async (roleId: string) => {
+    setIsLoadingLearning(true);
+    try {
+      const path = await learningApi.generatePath(parseInt(roleId));
+      setLearningPath(path);
+    } catch (error) {
+      console.error('Failed to generate learning path:', error);
+    } finally {
+      setIsLoadingLearning(false);
+    }
+  }, []);
+
+  const markStepComplete = useCallback(async (stepId: string) => {
+    if (!learningPath) return;
+    
+    setIsLoadingLearning(true);
+    try {
+      await learningApi.markStepComplete(learningPath.id, parseInt(stepId));
+      // Refresh the learning path
+      const updatedPath = await learningApi.getPath();
+      setLearningPath(updatedPath);
+    } catch (error) {
+      console.error('Failed to mark step complete:', error);
+    } finally {
+      setIsLoadingLearning(false);
+    }
+  }, [learningPath]);
+
+  // Extract gaps from career matches API response
+  const allGaps = (careerMatches || []).flatMap((m: any) => {
+    if (!m) return [];
+    if (m.missing_severity && m.missing_severity.length > 0) {
+      return m.missing_severity.map((item: any) => ({
+        skillId: item.skill,
+        skill: { name: item.skill },
+        severity: item.severity,
+        priority: item.priority || 5,
+      }));
+    }
+    return (m.missing_skills || []).map((skill: string) => ({
+      skillId: skill,
+      skill: { name: skill },
+      severity: 'medium',
+      priority: 5,
+    }));
+  });
 
   const addChatMessage = useCallback((message: ChatMessage) => {
     setChatMessages(prev => [...prev, message]);

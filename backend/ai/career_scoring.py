@@ -32,10 +32,35 @@ class CareerScoring:
         - Learning speed estimation (10%)
         """
         try:
-            user_skills = db.query(UserSkill).filter(
-                UserSkill.user_id == user_id
+            # Get latest skill assessment scores from SkillAssessmentSkill table
+            # This table has correct scores (percentages), unlike UserSkill which has corrupted data
+            from sqlalchemy import func
+            from models.skill_assessment import SkillAssessmentSkill, SkillAssessment
+            
+            # Get the latest assessment for each skill using a proper subquery
+            subquery = db.query(
+                SkillAssessmentSkill.skill_id,
+                func.max(SkillAssessmentSkill.id).label('max_id')
+            ).join(SkillAssessment).filter(
+                SkillAssessment.user_id == user_id
+            ).group_by(SkillAssessmentSkill.skill_id).subquery()
+            
+            latest_assessments = db.query(SkillAssessmentSkill).join(
+                subquery,
+                SkillAssessmentSkill.id == subquery.c.max_id
             ).all()
+            
+            # Use assessment skills if found, otherwise fallback to UserSkill
+            if latest_assessments:
+                user_skills = latest_assessments
+            else:
+                # Fallback to UserSkill if no assessments found
+                user_skills = db.query(UserSkill).filter(
+                    UserSkill.user_id == user_id
+                ).all()
+            
             user_skill_map = {us.skill_id: us for us in user_skills}
+
 
             # Calculate skill match percentage
             skill_match_pct = CareerScoring._calculate_skill_match(

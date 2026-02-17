@@ -1,7 +1,8 @@
 from .database import Base
-from sqlalchemy import Column, Integer, String, Text, Float, Index, text
+from sqlalchemy import Column, Integer, String, Text, Float, Index, text, ForeignKey
 from sqlalchemy.orm import relationship
 import json
+
 
 
 class JobRole(Base):
@@ -40,8 +41,16 @@ class JobRole(Base):
         server_default=text("0"),
     )
 
+    domain_id = Column(
+        Integer,
+        ForeignKey('domains.id'),
+        nullable=True,
+    )
+
     # Relationships
+    domain = relationship("Domain", back_populates="job_roles")
     learning_paths = relationship("LearningPath", back_populates="target_role")
+
     role_skill_requirements = relationship(
         "RoleSkillRequirement",
         back_populates="job_role",
@@ -59,7 +68,9 @@ class JobRole(Base):
     __table_args__ = (
         Index("idx_job_role_title", "title"),
         Index("idx_job_role_level", "level"),
+        Index("idx_job_role_domain", "domain_id"),
     )
+
 
     # -------------------------
     # JSON helpers
@@ -79,4 +90,6 @@ class JobRole(Base):
             "average_salary": self.get_average_salary(),
             "demand_score": self.demand_score,
             "growth_rate": self.growth_rate,
+            "domain_id": self.domain_id,
+            "domain_name": self.domain.name if self.domain else None,
         }

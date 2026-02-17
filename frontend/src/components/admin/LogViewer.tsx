@@ -51,11 +51,30 @@ export default function LogViewer() {
   const [timeRange, setTimeRange] = useState('24');
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingFile, setViewingFile] = useState<LogFile | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
+  // Initial data load
   useEffect(() => {
     fetchLogFiles();
     fetchErrors();
   }, [timeRange]);
+
+  // Auto-refresh interval
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (autoRefresh) {
+      interval = setInterval(() => {
+        fetchLogFiles();
+        fetchErrors();
+      }, 10000); // Refresh every 10 seconds
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [autoRefresh, timeRange]);
+
 
   const fetchLogFiles = async () => {
     try {
@@ -176,13 +195,21 @@ export default function LogViewer() {
                 <SelectItem value="168">Last 7 days</SelectItem>
               </SelectContent>
             </Select>
+            <Button 
+              variant={autoRefresh ? "default" : "outline"}
+              onClick={() => setAutoRefresh(!autoRefresh)}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+              {autoRefresh ? 'Live Updates On' : 'Live Updates Off'}
+            </Button>
             <Button variant="outline" onClick={() => {
               fetchLogFiles();
               fetchErrors();
             }}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
+              Refresh Now
             </Button>
+
           </div>
         </CardContent>
       </Card>

@@ -50,11 +50,17 @@ class LearningPathStep(Base):
         nullable=False,
     )
 
+    assessment_questions = Column(
+        Text,
+        nullable=True,
+    )
+
     is_completed = Column(
         Boolean,
         nullable=False,
         server_default=text("0"),
     )
+
 
     # Relationships
     skill = relationship("Skill", back_populates="learning_path_steps")
@@ -84,7 +90,14 @@ class LearningPathStep(Base):
     def set_dependencies(self, dependencies_list):
         self.dependencies = json.dumps(dependencies_list)
 
+    def get_assessment_questions(self):
+        return json.loads(self.assessment_questions) if self.assessment_questions else []
+
+    def set_assessment_questions(self, questions_list):
+        self.assessment_questions = json.dumps(questions_list)
+
     def to_dict(self) -> dict:
+
         try:
             resources = self.get_resources() if self.resources else []
         except Exception:
@@ -95,13 +108,29 @@ class LearningPathStep(Base):
         except Exception:
             dependencies = []
         
+        # Safely serialize skill information
+        skill_dict = None
+        try:
+            if self.skill:
+                skill_dict = {
+                    "id": self.skill.id,
+                    "name": getattr(self.skill, 'name', None),
+                    "description": getattr(self.skill, 'description', None),
+                }
+        except Exception:
+            skill_dict = None
+        
         return {
             "id": self.id,
             "skill_id": self.skill_id,
+            "skill": skill_dict,
             "target_level": self.target_level,
+            "targetLevel": self.target_level,  # camelCase for frontend
             "order": self.order,
             "estimated_duration": self.estimated_duration,
+            "estimatedDuration": self.estimated_duration,  # camelCase for frontend
             "resources": resources,
             "dependencies": dependencies,
             "is_completed": self.is_completed,
+            "isCompleted": self.is_completed,  # camelCase for frontend
         }

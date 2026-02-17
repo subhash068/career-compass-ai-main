@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { 
@@ -17,12 +18,215 @@ import {
   Linkedin,
   Twitter,
   Mail,
-  Heart
+  Heart,
+  Compass,
+  Star,
+  Menu,
+  X
 } from 'lucide-react';
 
 
+
+// Creative Header Component
+const CreativeHeader = ({ navigate }: { navigate: (path: string) => void }) => {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const headerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const navItems = [
+    { name: 'Home', path: '/', icon: Compass },
+    { name: 'About', path: '/about', icon: Star },
+    { name: 'Contact', path: '#contact', icon: MessageSquare },
+  ];
+
+  const scrollToSection = (path: string) => {
+    if (path.startsWith('#')) {
+      const element = document.querySelector(path);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else {
+      navigate(path);
+    }
+    setIsMobileMenuOpen(false);
+  };
+
+  return (
+    <header
+      ref={headerRef}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${
+        isScrolled 
+          ? 'py-3' 
+          : 'py-5'
+      }`}
+    >
+      {/* Glass Morphism Container - Full Width */}
+      <div className={`transition-all duration-500 ${
+        isScrolled 
+          ? 'bg-background/80 backdrop-blur-xl shadow-2xl shadow-primary/10 border-b border-white/20' 
+          : 'bg-transparent'
+      }`}>
+        <div className="px-4 md:px-6 lg:px-8 py-3 flex items-center justify-between relative overflow-hidden max-w-7xl mx-auto">
+
+          {/* Logo Section */}
+          <div 
+            className="flex items-center gap-3 cursor-pointer group relative"
+            onClick={() => navigate('/')}
+          >
+            <div className="absolute -inset-4 bg-gradient-to-r from-primary/30 via-secondary/30 to-accent/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-all duration-700 animate-pulse" />
+            <div className="relative w-12 h-12 perspective-1000">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary via-secondary to-accent rounded-xl transform group-hover:rotate-y-12 group-hover:rotate-x-12 transition-transform duration-500 shadow-lg group-hover:shadow-primary/50">
+                <div className="absolute inset-1 bg-background rounded-lg flex items-center justify-center overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20 animate-pulse" />
+                  <Compass className="w-6 h-6 text-primary relative z-10 group-hover:scale-110 transition-transform duration-300" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full animate-bounce shadow-lg shadow-accent/50" />
+                <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-secondary rounded-full animate-ping" />
+              </div>
+            </div>
+            <div className="hidden sm:block">
+              <span className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent animate-gradient bg-[length:200%_auto]">
+                Career Compass
+              </span>
+              <span className="block text-xs text-muted-foreground -mt-1 tracking-widest uppercase">AI Powered</span>
+            </div>
+          </div>
+
+          {/* Desktop Navigation - Pill Design */}
+          <nav className="hidden md:flex items-center gap-2 bg-muted/40 backdrop-blur-md rounded-full px-2 py-1.5 border border-border/50 shadow-inner">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isHovered = hoveredItem === item.name;
+              const isActive = item.path === '/' ? window.location.pathname === '/' : window.location.pathname.startsWith(item.path);
+              
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => scrollToSection(item.path)}
+                  onMouseEnter={() => setHoveredItem(item.name)}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  className="relative px-5 py-2 rounded-full group transition-all duration-300"
+                >
+                  <div className={`absolute inset-0 rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-300 ${
+                    isActive ? 'opacity-100' : 'opacity-0'
+                  }`} />
+                  <div className={`absolute inset-0 rounded-full bg-gradient-to-r from-primary/20 to-secondary/20 transition-all duration-300 ${
+                    isHovered && !isActive ? 'opacity-100' : 'opacity-0'
+                  }`} />
+                  <div className={`absolute inset-0 rounded-full blur-md bg-primary/30 transition-all duration-300 ${
+                    isHovered || isActive ? 'opacity-100' : 'opacity-0'
+                  }`} />
+                  <span className={`relative flex items-center gap-2 text-sm font-medium transition-colors ${
+                    isActive ? 'text-white' : 'text-foreground/70 group-hover:text-primary'
+                  }`}>
+                    <Icon className={`w-4 h-4 transition-all duration-300 ${
+                      isHovered || isActive ? 'scale-110 rotate-6' : ''
+                    } ${isActive ? 'text-white' : ''}`} />
+                    {item.name}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* CTA Buttons */}
+          <div className="hidden md:flex items-center gap-3">
+            <button
+              onClick={() => navigate('/login')}
+              className="relative px-5 py-2.5 rounded-full overflow-hidden group bg-background/50 backdrop-blur-sm border border-border/60 hover:border-primary/40 transition-all duration-300"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="relative text-sm font-medium text-foreground/80 group-hover:text-primary transition-colors flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                Sign In
+              </span>
+            </button>
+
+            <button
+              onClick={() => navigate('/register')}
+              className="relative px-6 py-2.5 rounded-full overflow-hidden group shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300 hover:scale-105"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-accent rounded-full animate-gradient bg-[length:200%_auto]" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+              <div className="absolute inset-0.5 rounded-full bg-gradient-to-r from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="relative text-sm font-semibold text-white flex items-center gap-2">
+                Get Started
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform duration-300" />
+              </span>
+            </button>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden relative w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group"
+          >
+            <div className="absolute inset-0 rounded-full bg-primary/10 scale-0 group-hover:scale-100 transition-transform duration-300" />
+            {isMobileMenuOpen ? (
+              <X className="w-5 h-5 text-primary relative z-10 animate-spin-once" />
+            ) : (
+              <Menu className="w-5 h-5 text-primary relative z-10" />
+            )}
+          </button>
+        </div>
+
+        {/* Mobile Menu */}
+        <div className={`md:hidden overflow-hidden transition-all duration-500 ${
+          isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}>
+          <div className="px-6 pb-6 space-y-3">
+            {navItems.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => scrollToSection(item.path)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-muted/50 hover:bg-primary/10 transition-all duration-300 group"
+                  style={{ 
+                    animationDelay: `${index * 100}ms`,
+                    animation: isMobileMenuOpen ? 'slideInRight 0.5s ease-out forwards' : 'none'
+                  }}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="font-medium">{item.name}</span>
+                </button>
+              );
+            })}
+            <div className="pt-3 space-y-2">
+              <button
+                onClick={() => navigate('/login')}
+                className="w-full py-3 rounded-xl border border-border hover:border-primary/50 transition-colors font-medium"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => navigate('/register')}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-secondary text-white font-medium hover:opacity-90 transition-opacity"
+              >
+                Get Started
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
 export default function About() {
   const navigate = useNavigate();
+
 
   const techStack = [
     {
@@ -100,7 +304,14 @@ export default function About() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+      {/* Creative Header */}
+      <CreativeHeader navigate={navigate} />
+      
+      {/* Spacer for fixed header */}
+      <div className="h-24" />
+
       {/* Hero Section */}
+
       <section className="relative px-6 py-20 lg:py-32 overflow-hidden">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-r from-secondary/20 to-accent/20 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -128,7 +339,7 @@ export default function About() {
             <Button 
               size="lg" 
               onClick={() => navigate('/register')}
-              className="text-lg px-8 bg-gradient-to-r from-primary to-secondary hover:opacity-90 transition-all duration-300 hover:scale-105 group"
+              className="text-lg px-8 bg-gradient-to-r from-primary to-secondary hover:opacity-110 transition-all duration-300 hover:scale-105 group"
             >
               Get Started
               <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -137,7 +348,7 @@ export default function About() {
               variant="outline" 
               size="lg"
               onClick={() => navigate('/')}
-              className="text-lg px-8 hover:bg-primary/5 transition-all duration-300 hover:scale-105 border-2"
+              className="text-lg px-8 hover:bg-primary/5 hover:text-primary transition-all duration-300 hover:scale-110 border-4"
             >
               Back to Home
             </Button>
@@ -239,7 +450,7 @@ export default function About() {
         </div>
       </section>
 
-      {/* Technology Stack */}
+      {/* Technology Stack
       <section className="px-6 py-20 bg-muted/30">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -275,9 +486,9 @@ export default function About() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
-      {/* Architecture Section */}
+      {/* Architecture Section
       <section className="px-6 py-20">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -307,9 +518,9 @@ export default function About() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
-      {/* API Documentation Preview */}
+      {/* API Documentation Preview
       <section className="px-6 py-20 bg-muted/30">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -403,7 +614,7 @@ export default function About() {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* CTA Section */}
       <section className="px-6 py-20">
@@ -459,16 +670,16 @@ export default function About() {
                 Personalized guidance for your professional journey.
               </p>
               <div className="flex gap-4">
-                <Button variant="ghost" size="icon" className="rounded-full hover:bg-primary/10">
+                <Button variant="ghost" size="icon" className="rounded-full">
                   <Github className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="rounded-full hover:bg-primary/10">
+                <Button variant="ghost" size="icon" className="rounded-full">
                   <Twitter className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="rounded-full hover:bg-primary/10">
+                <Button variant="ghost" size="icon" className="rounded-full">
                   <Linkedin className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="rounded-full hover:bg-primary/10">
+                <Button variant="ghost" size="icon" className="rounded-full">
                   <Mail className="w-5 h-5" />
                 </Button>
               </div>

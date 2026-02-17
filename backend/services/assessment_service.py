@@ -49,13 +49,15 @@ class AssessmentService:
             missing_ids = set(request.skill_ids) - found_ids
             raise ValueError(f"Skills not found or not in domain: {list(missing_ids)}")
 
-        # Create assessment record
+        # Create assessment record with domain
         assessment = SkillAssessment(
             user_id=user_id,
-            status='initialized'
+            status='initialized',
+            domain_id=request.domain_id
         )
         db.add(assessment)
         db.flush()  # Get assessment ID
+
 
         # Convert to response format
         skill_infos = [
@@ -133,11 +135,13 @@ class AssessmentService:
             SkillQuestion.skill_id == request.skill_id
         ).all()
 
-        if len(questions) < 10:
-            raise ValueError(f"Insufficient questions for skill {request.skill_id}")
+        if len(questions) == 0:
+            raise ValueError(f"No questions available for skill {request.skill_id}")
 
-        # Randomize and limit to 10
-        selected_questions = random.sample(questions, 10)
+        # Randomize and limit to 10 (or fewer if not enough questions)
+        num_questions = min(len(questions), 10)
+        selected_questions = random.sample(questions, num_questions)
+
 
         # Convert to response format
         question_responses = [
@@ -197,13 +201,24 @@ class AssessmentService:
         total_questions = len(request.answers)
         correct_answers = 0
 
+        # Debug logging
+        print(f"DEBUG: Processing {total_questions} answers for skill {request.skill_id}")
+        print(f"DEBUG: Available questions: {[q.id for q in questions]}")
+
         # Store answers
         for question_id, user_answer in request.answers.items():
             question = next((q for q in questions if q.id == question_id), None)
             if not question:
+                print(f"DEBUG: Question {question_id} not found in available questions")
                 continue
 
-            is_correct = user_answer == question.correct_answer
+            # Normalize answers for comparison (strip whitespace, case-insensitive for text)
+            normalized_user = str(user_answer).strip()
+            normalized_correct = str(question.correct_answer).strip()
+            
+            is_correct = normalized_user == normalized_correct
+            
+            print(f"DEBUG: Q{question_id}: User='{normalized_user}' | Correct='{normalized_correct}' | Match={is_correct}")
 
             if is_correct:
                 correct_answers += 1
@@ -219,6 +234,8 @@ class AssessmentService:
             db.add(user_answer_record)
 
         percentage = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
+        print(f"DEBUG: Final score: {correct_answers}/{total_questions} = {percentage}%")
+
 
         # Determine level
         if percentage <= 40:

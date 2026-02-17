@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = 'http://10.50.27.1111:5000';
 
 interface ApiResponse<T = any> {
   data?: T;

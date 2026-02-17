@@ -65,10 +65,14 @@ class User(Base):
     assessment_records = relationship("Assessment", back_populates="user", cascade="all, delete-orphan")
     learning_paths = relationship("LearningPath", back_populates="user", cascade="all, delete-orphan")
     chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
+    notes = relationship("UserNote", back_populates="user", cascade="all, delete-orphan")
+    resumes = relationship("Resume", back_populates="user", cascade="all, delete-orphan")
 
     # -------------------------
     # Password helpers
     # -------------------------
+
+
     def set_password(self, password: str) -> None:
         hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
         self.password_hash = hashed.decode("utf-8")

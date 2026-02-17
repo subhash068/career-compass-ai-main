@@ -14,7 +14,7 @@ const levelConfig: Record<SkillLevel, { label: string; class: string }> = {
 };
 
 export function SkillBadge({ level, className }: SkillBadgeProps) {
-  const config = levelConfig[level];
+  const config = levelConfig[level] || { label: 'Unknown', class: 'bg-gray-100 text-gray-700 border-gray-200' };
   return (
     <span className={cn(
       "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
@@ -38,7 +38,7 @@ const severityConfig: Record<GapSeverity, { label: string; class: string }> = {
 };
 
 export function GapBadge({ severity, className }: GapBadgeProps) {
-  const config = severityConfig[severity];
+  const config = severityConfig[severity] || { label: 'Unknown', class: 'bg-gray-100 text-gray-700 border-gray-200' };
   return (
     <span className={cn(
       "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
