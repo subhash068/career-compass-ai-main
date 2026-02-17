@@ -7,6 +7,19 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+
+testing
+RESUME_FEATURE_SUMMARY.md
+TCS_Academic_Project_Description.md
+TODO.md
+test_output.txt
+notes.txt
+ADMIN.TXT
+entity_identification.txt
+er_diagram.txt
+
+
+
 node_modules
 dist
 dist-ssr
