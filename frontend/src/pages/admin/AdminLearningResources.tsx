@@ -15,7 +15,6 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogTrigger,
   DialogFooter
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +35,9 @@ import {
   BookOpen,
   Video,
   FileText,
-  ExternalLink
+  ExternalLink,
+  X,
+  Save
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { adminApi } from '@/api/admin.api';
@@ -112,11 +113,12 @@ export default function AdminLearningResources() {
     }
   };
 
-  const handleCreateResource = async () => {
+  const handleCreateResource = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
       await adminApi.createLearningResource({
         ...formData,
-        skill_id: parseInt(formData.skill_id),
+        skill_id: parseInt(formData.skill_id) || 0,
       });
       toast({
         title: 'Success',
@@ -135,13 +137,14 @@ export default function AdminLearningResources() {
     }
   };
 
-  const handleUpdateResource = async () => {
+  const handleUpdateResource = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!selectedResource) return;
 
     try {
       await adminApi.updateLearningResource(selectedResource.id, {
         ...formData,
-        skill_id: parseInt(formData.skill_id),
+        skill_id: parseInt(formData.skill_id) || 0,
       });
       toast({
         title: 'Success',
@@ -186,16 +189,16 @@ export default function AdminLearningResources() {
   const openEditDialog = (resource: LearningResource) => {
     setSelectedResource(resource);
     setFormData({
-      title: resource.title,
-      description: resource.description,
-      type: resource.type,
-      url: resource.url,
-      skill_id: resource.skill_id.toString(),
-      difficulty: resource.difficulty,
-      duration: resource.duration,
-      provider: resource.provider,
-      cost: resource.cost,
-      rating: resource.rating,
+      title: resource.title || '',
+      description: resource.description || '',
+      type: resource.type || 'article',
+      url: resource.url || '',
+      skill_id: resource.skill_id?.toString() || '',
+      difficulty: resource.difficulty || 'beginner',
+      duration: resource.duration || '',
+      provider: resource.provider || '',
+      cost: resource.cost || 'free',
+      rating: resource.rating || 0,
     });
     setIsEditDialogOpen(true);
   };
@@ -224,146 +227,6 @@ export default function AdminLearningResources() {
     resource.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     resource.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     resource.skill?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const ResourceForm = ({ onSubmit, submitLabel }: { onSubmit: () => void, submitLabel: string }) => (
-    <div className="space-y-4">
-      <div>
-        <Label htmlFor="title">Title *</Label>
-        <Input
-          id="title"
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-          placeholder="Enter resource title"
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Input
-          id="description"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          placeholder="Enter resource description"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="type">Type</Label>
-          <Select
-            value={formData.type}
-            onValueChange={(value) => setFormData({ ...formData, type: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="article">Article</SelectItem>
-              <SelectItem value="video">Video</SelectItem>
-              <SelectItem value="course">Course</SelectItem>
-              <SelectItem value="tutorial">Tutorial</SelectItem>
-              <SelectItem value="documentation">Documentation</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="difficulty">Difficulty</Label>
-          <Select
-            value={formData.difficulty}
-            onValueChange={(value) => setFormData({ ...formData, difficulty: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select difficulty" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="beginner">Beginner</SelectItem>
-              <SelectItem value="intermediate">Intermediate</SelectItem>
-              <SelectItem value="advanced">Advanced</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="url">URL *</Label>
-        <Input
-          id="url"
-          value={formData.url}
-          onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-          placeholder="https://example.com/resource"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="skill_id">Skill ID *</Label>
-          <Input
-            id="skill_id"
-            type="number"
-            value={formData.skill_id}
-            onChange={(e) => setFormData({ ...formData, skill_id: e.target.value })}
-            placeholder="Enter skill ID"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="duration">Duration</Label>
-          <Input
-            id="duration"
-            value={formData.duration}
-            onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-            placeholder="e.g., 2 hours, 4 weeks"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="provider">Provider</Label>
-          <Input
-            id="provider"
-            value={formData.provider}
-            onChange={(e) => setFormData({ ...formData, provider: e.target.value })}
-            placeholder="e.g., Udemy, Coursera"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="cost">Cost</Label>
-          <Select
-            value={formData.cost}
-            onValueChange={(value) => setFormData({ ...formData, cost: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select cost" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="free">Free</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="rating">Rating (0-5)</Label>
-        <Input
-          id="rating"
-          type="number"
-          min="0"
-          max="5"
-          step="0.1"
-          value={formData.rating}
-          onChange={(e) => setFormData({ ...formData, rating: parseFloat(e.target.value) })}
-        />
-      </div>
-
-      <DialogFooter>
-        <Button onClick={onSubmit}>{submitLabel}</Button>
-      </DialogFooter>
-    </div>
   );
 
   if (loading) {
@@ -509,22 +372,376 @@ export default function AdminLearningResources() {
       </Card>
 
       {/* Create Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl">
+      <Dialog 
+        open={isCreateDialogOpen} 
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) resetForm();
+        }}
+      >
+        <DialogContent 
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        >
+
           <DialogHeader>
             <DialogTitle>Create Learning Resource</DialogTitle>
           </DialogHeader>
-          <ResourceForm onSubmit={handleCreateResource} submitLabel="Create Resource" />
+          
+          <form onSubmit={handleCreateResource} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="create-title">Title *</Label>
+              <Input
+                id="create-title"
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Enter resource title"
+                className="w-full"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-description">Description</Label>
+              <Input
+                id="create-description"
+                type="text"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Enter resource description"
+                className="w-full"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-type">Type</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value) => setFormData({ ...formData, type: value })}
+                >
+                  <SelectTrigger id="create-type" className="w-full">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="article">Article</SelectItem>
+                    <SelectItem value="video">Video</SelectItem>
+                    <SelectItem value="course">Course</SelectItem>
+                    <SelectItem value="tutorial">Tutorial</SelectItem>
+                    <SelectItem value="documentation">Documentation</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-difficulty">Difficulty</Label>
+                <Select
+                  value={formData.difficulty}
+                  onValueChange={(value) => setFormData({ ...formData, difficulty: value })}
+                >
+                  <SelectTrigger id="create-difficulty" className="w-full">
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="beginner">Beginner</SelectItem>
+                    <SelectItem value="intermediate">Intermediate</SelectItem>
+                    <SelectItem value="advanced">Advanced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-url">URL *</Label>
+              <Input
+                id="create-url"
+                type="url"
+                value={formData.url}
+                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                placeholder="https://example.com/resource"
+                className="w-full"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-skill_id">Skill ID *</Label>
+                <Input
+                  id="create-skill_id"
+                  type="number"
+                  value={formData.skill_id}
+                  onChange={(e) => setFormData({ ...formData, skill_id: e.target.value })}
+                  placeholder="Enter skill ID"
+                  className="w-full"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-duration">Duration</Label>
+                <Input
+                  id="create-duration"
+                  type="text"
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                  placeholder="e.g., 2 hours, 4 weeks"
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-provider">Provider</Label>
+                <Input
+                  id="create-provider"
+                  type="text"
+                  value={formData.provider}
+                  onChange={(e) => setFormData({ ...formData, provider: e.target.value })}
+                  placeholder="e.g., Udemy, Coursera"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-cost">Cost</Label>
+                <Select
+                  value={formData.cost}
+                  onValueChange={(value) => setFormData({ ...formData, cost: value })}
+                >
+                  <SelectTrigger id="create-cost" className="w-full">
+                    <SelectValue placeholder="Select cost" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-rating">Rating (0-5)</Label>
+              <Input
+                id="create-rating"
+                type="number"
+                min="0"
+                max="5"
+                step="0.1"
+                value={formData.rating}
+                onChange={(e) => setFormData({ ...formData, rating: parseFloat(e.target.value) || 0 })}
+                className="w-full"
+              />
+            </div>
+
+            <DialogFooter className="gap-2 pt-4">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => {
+                  setIsCreateDialogOpen(false);
+                  resetForm();
+                }}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+              <Button type="submit">
+                <Save className="w-4 h-4 mr-2" />
+                Create Resource
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+      <Dialog 
+        open={isEditDialogOpen} 
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            setSelectedResource(null);
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent 
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        >
+
           <DialogHeader>
             <DialogTitle>Edit Learning Resource</DialogTitle>
           </DialogHeader>
-          <ResourceForm onSubmit={handleUpdateResource} submitLabel="Update Resource" />
+          
+          <form onSubmit={handleUpdateResource} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Title *</Label>
+              <Input
+                id="edit-title"
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Enter resource title"
+                className="w-full"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Input
+                id="edit-description"
+                type="text"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Enter resource description"
+                className="w-full"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-type">Type</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value) => setFormData({ ...formData, type: value })}
+                >
+                  <SelectTrigger id="edit-type" className="w-full">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="article">Article</SelectItem>
+                    <SelectItem value="video">Video</SelectItem>
+                    <SelectItem value="course">Course</SelectItem>
+                    <SelectItem value="tutorial">Tutorial</SelectItem>
+                    <SelectItem value="documentation">Documentation</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-difficulty">Difficulty</Label>
+                <Select
+                  value={formData.difficulty}
+                  onValueChange={(value) => setFormData({ ...formData, difficulty: value })}
+                >
+                  <SelectTrigger id="edit-difficulty" className="w-full">
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="beginner">Beginner</SelectItem>
+                    <SelectItem value="intermediate">Intermediate</SelectItem>
+                    <SelectItem value="advanced">Advanced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-url">URL *</Label>
+              <Input
+                id="edit-url"
+                type="url"
+                value={formData.url}
+                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                placeholder="https://example.com/resource"
+                className="w-full"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-skill_id">Skill ID *</Label>
+                <Input
+                  id="edit-skill_id"
+                  type="number"
+                  value={formData.skill_id}
+                  onChange={(e) => setFormData({ ...formData, skill_id: e.target.value })}
+                  placeholder="Enter skill ID"
+                  className="w-full"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-duration">Duration</Label>
+                <Input
+                  id="edit-duration"
+                  type="text"
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                  placeholder="e.g., 2 hours, 4 weeks"
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-provider">Provider</Label>
+                <Input
+                  id="edit-provider"
+                  type="text"
+                  value={formData.provider}
+                  onChange={(e) => setFormData({ ...formData, provider: e.target.value })}
+                  placeholder="e.g., Udemy, Coursera"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-cost">Cost</Label>
+                <Select
+                  value={formData.cost}
+                  onValueChange={(value) => setFormData({ ...formData, cost: value })}
+                >
+                  <SelectTrigger id="edit-cost" className="w-full">
+                    <SelectValue placeholder="Select cost" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-rating">Rating (0-5)</Label>
+              <Input
+                id="edit-rating"
+                type="number"
+                min="0"
+                max="5"
+                step="0.1"
+                value={formData.rating}
+                onChange={(e) => setFormData({ ...formData, rating: parseFloat(e.target.value) || 0 })}
+                className="w-full"
+              />
+            </div>
+
+            <DialogFooter className="gap-2 pt-4">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => {
+                  setIsEditDialogOpen(false);
+                  setSelectedResource(null);
+                  resetForm();
+                }}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+              <Button type="submit">
+                <Save className="w-4 h-4 mr-2" />
+                Update Resource
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
