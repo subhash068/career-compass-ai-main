@@ -29,7 +29,7 @@ const navItems = [
   { to: '/gaps', icon: TrendingUp, label: 'Gap Analysis' },
   { to: '/careers', icon: Briefcase, label: 'Career Matches' },
   { to: '/learning', icon: GraduationCap, label: 'Learning Path' },
-  { to: '/notes', icon: FileText, label: 'My Notes' },
+  // { to: '/notes', icon: FileText, label: 'My Notes' },
   { to: '/resumes', icon: FileUser, label: 'My Resumes' },
 ];
 

@@ -263,15 +263,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!m) return [];
     if (m.missing_severity && m.missing_severity.length > 0) {
       return m.missing_severity.map((item: any) => ({
-        skillId: item.skill,
-        skill: { name: item.skill },
+        skillId: item.skill_id || item.skill?.id || item.skill_name,
+        skill: item.skill || { 
+          id: item.skill_id,
+          name: item.skill_name || 'Unknown Skill',
+          description: item.description || '',
+          categoryId: item.category_id,
+          demandLevel: item.demand_level || 0
+        },
         severity: item.severity,
         priority: item.priority || 5,
+        gap: item.gap,
+        effectiveGap: item.effective_gap,
+        currentScore: item.current_score,
+        requiredScore: item.required_score,
+        requiredLevel: item.required_level,
+        description: item.description,
+        inferredBonus: item.inferred_bonus,
       }));
     }
     return (m.missing_skills || []).map((skill: string) => ({
       skillId: skill,
-      skill: { name: skill },
+      skill: { 
+        id: skill,
+        name: skill,
+        description: '',
+        categoryId: null,
+        demandLevel: 0
+      },
       severity: 'medium',
       priority: 5,
     }));

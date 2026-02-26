@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
@@ -7,7 +7,9 @@ from models.role_skill_requirement import RoleSkillRequirement
 from models.user_skill import UserSkill
 from models.skill_assessment import SkillAssessmentSkill, SkillAssessment
 from models.domain import Domain
+from models.skill import Skill
 from ai.career_scoring import CareerScoring
+
 
 
 
@@ -47,13 +49,41 @@ class CareerService:
     @staticmethod
     def _get_user_latest_domain(db: Session, user_id: int) -> Optional[int]:
         """
-        Get the user's latest assessed domain ID.
+        Get the user's latest assessed domain ID from their actual skills.
+        This ensures we use the correct domain based on what skills they actually assessed.
         """
+        # Get user's latest skill assessments
+        subquery = db.query(
+            SkillAssessmentSkill.skill_id,
+            func.max(SkillAssessmentSkill.id).label('max_id')
+        ).join(SkillAssessment).filter(
+            SkillAssessment.user_id == user_id
+        ).group_by(SkillAssessmentSkill.skill_id).subquery()
+        
+        latest_assessments = db.query(SkillAssessmentSkill).join(
+            subquery,
+            SkillAssessmentSkill.id == subquery.c.max_id
+        ).all()
+        
+        if latest_assessments:
+            # Get domain from the first assessed skill's actual domain
+            first_skill_id = latest_assessments[0].skill_id
+            first_skill = db.query(Skill).filter_by(id=first_skill_id).first()
+            if first_skill and first_skill.domain_id:
+                print(f"[DEBUG] CareerService: Detected domain ID {first_skill.domain_id} from user's actual skills")
+                return first_skill.domain_id
+        
+        # Fallback to assessment record domain if no skills found
         latest_assessment = db.query(SkillAssessment).filter(
             SkillAssessment.user_id == user_id
         ).order_by(desc(SkillAssessment.created_at)).first()
         
-        return latest_assessment.domain_id if latest_assessment else None
+        if latest_assessment:
+            print(f"[DEBUG] CareerService: Fallback - Using assessment domain ID: {latest_assessment.domain_id}")
+            return latest_assessment.domain_id
+        
+        return None
+
 
 
     @staticmethod
@@ -81,6 +111,27 @@ class CareerService:
         return {us.skill_id: us for us in user_skills}
 
     @staticmethod
+    def _get_user_domain_skills(db: Session, user_id: int, domain_id: Optional[int] = None) -> Set[int]:
+        """
+        Get all skill IDs in user's assessed domain.
+        Returns set of all domain skills (attempted + unattempted).
+        """
+        if not domain_id:
+            # Try to get domain from latest assessment
+            latest_assessment = db.query(SkillAssessment).filter(
+                SkillAssessment.user_id == user_id
+            ).order_by(desc(SkillAssessment.created_at)).first()
+            domain_id = latest_assessment.domain_id if latest_assessment else None
+        
+        if not domain_id:
+            return set()
+        
+        # Get all skills in the domain
+        domain_skills = db.query(Skill).filter_by(domain_id=domain_id).all()
+        return {skill.id for skill in domain_skills}
+
+
+    @staticmethod
     def recommend_careers(
         db: Session,
         user_id: int,
@@ -101,7 +152,16 @@ class CareerService:
         print(f"[DEBUG] recommend_careers called for user {user_id}, domain_id={domain_id}")
         
         user_skill_map = CareerService._get_user_skills_map(db, user_id)
-        print(f"[DEBUG] Found {len(user_skill_map)} skills for career matching")
+        print(f"[DEBUG] Found {len(user_skill_map)} attempted skills for career matching")
+        
+        # Get all domain skills to identify unattempted ones
+        all_domain_skill_ids = CareerService._get_user_domain_skills(db, user_id, domain_id)
+        print(f"[DEBUG] Found {len(all_domain_skill_ids)} total skills in user's domain")
+        
+        # Calculate how many domain skills are unattempted
+        unattempted_count = len(all_domain_skill_ids - set(user_skill_map.keys()))
+        print(f"[DEBUG] {unattempted_count} skills in domain are unattempted")
+
 
         # Get domain name if domain_id is provided
         domain_name = None
@@ -110,17 +170,14 @@ class CareerService:
             domain_name = domain.name if domain else None
             print(f"[DEBUG] User's domain: {domain_name} (ID: {domain_id})")
 
-        # Query all roles, optionally filtering by domain
+        # Query roles - strictly filter by domain if provided
         if domain_id:
-            # Get roles from user's domain first, then other domains
-            domain_roles = db.query(JobRole).filter(JobRole.domain_id == domain_id).all()
-            other_roles = db.query(JobRole).filter(
-                (JobRole.domain_id != domain_id) | (JobRole.domain_id.is_(None))
-            ).all()
-            roles = domain_roles + other_roles
-            print(f"[DEBUG] Found {len(domain_roles)} roles in user's domain, {len(other_roles)} in other domains")
+            # Only get roles from user's assessed domain
+            roles = db.query(JobRole).filter(JobRole.domain_id == domain_id).all()
+            print(f"[DEBUG] Found {len(roles)} roles in user's domain (ID: {domain_id})")
         else:
             roles = db.query(JobRole).all()
+
             
         recommendations = []
 
@@ -138,10 +195,11 @@ class CareerService:
                 db, user_id, requirements
             )
 
-            # Get matched/missing skills
+            # Get matched/missing skills (including unattempted as missing)
             match_pct, matched, missing = CareerService._calculate_match_score(
-                user_skill_map, requirements
+                user_skill_map, requirements, all_domain_skill_ids
             )
+
 
             # Skip if below minimum match threshold
             if match_pct < min_match:
@@ -151,20 +209,36 @@ class CareerService:
             skill_requirements = []
             for req in requirements:
                 user_skill = user_skill_map.get(req.skill_id)
-                current_score = user_skill.score if user_skill else 0
+                
+                # Check if skill is unattempted (in domain but not assessed)
+                is_unattempted = (
+                    all_domain_skill_ids and 
+                    req.skill_id in all_domain_skill_ids and 
+                    user_skill is None
+                )
+                
+                if is_unattempted:
+                    current_score = 0
+                    user_level = "unattempted"
+                else:
+                    current_score = user_skill.score if user_skill else 0
+                    user_level = user_skill.level if user_skill else "none"
+                    
                 required_score = CareerService._level_to_score(req.required_level)
                 
                 skill_requirements.append({
                     "skill_id": req.skill_id,
                     "skill_name": req.skill.name if req.skill else f"Skill {req.skill_id}",
                     "required_level": req.required_level,
-                    "user_level": user_skill.level if user_skill else "none",
+                    "user_level": user_level,
                     "user_score": current_score,
                     "required_score": required_score,
                     "gap": max(0, required_score - current_score),
                     "weight": req.weight,
-                    "is_matched": current_score >= required_score
+                    "is_matched": current_score >= required_score,
+                    "is_unattempted": is_unattempted
                 })
+
 
             # Sort requirements by gap (largest first) for priority
             skill_requirements.sort(key=lambda x: x["gap"], reverse=True)
@@ -221,18 +295,15 @@ class CareerService:
 
             recommendations.append(recommendation)
 
-        # Sort by:
-        # 1. Whether it's in user's domain (True comes before False)
-        # 2. Match percentage (descending)
-        # 3. Demand score (descending)
+        # Sort by match percentage (descending) then demand score
         recommendations.sort(
             key=lambda x: (
-                not x.get("is_in_user_domain", False),  # Domain matches first
                 x["match_percentage"],  # Higher match percentage
                 x["demand_score"]  # Higher demand score
             ),
             reverse=True
         )
+
 
         return recommendations[:top_n]
 
@@ -379,7 +450,8 @@ class CareerService:
     @staticmethod
     def _calculate_match_score(
         user_skills: Dict[int, UserSkill],
-        requirements: List[RoleSkillRequirement]
+        requirements: List[RoleSkillRequirement],
+        all_domain_skill_ids: Optional[Set[int]] = None
     ) -> tuple[int, List[str], List[str]]:
 
         total_weight = 0.0
@@ -391,7 +463,20 @@ class CareerService:
             total_weight += req.weight
 
             user_skill = user_skills.get(req.skill_id)
-            current_score = user_skill.score if user_skill else 0
+            
+            # Determine if skill is in user's domain but unattempted
+            is_unattempted = (
+                all_domain_skill_ids and 
+                req.skill_id in all_domain_skill_ids and 
+                user_skill is None
+            )
+            
+            # For unattempted skills, treat as score 0 (completely missing)
+            if is_unattempted:
+                current_score = 0
+            else:
+                current_score = user_skill.score if user_skill else 0
+                
             required_score = CareerService._level_to_score(req.required_level)
 
             skill_name = req.skill.name if req.skill else f"Skill {req.skill_id}"
@@ -409,6 +494,7 @@ class CareerService:
         match_percentage = max(0, min(100, match_percentage))
 
         return match_percentage, matched_skills, missing_skills
+
 
     @staticmethod
     def get_details(

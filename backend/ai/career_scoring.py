@@ -350,16 +350,30 @@ class CareerScoring:
                     severity = "high"
                     description = "Core skill missing" + (" (inference may not suffice)" if inferred_bonus > 0 else "")
 
+                # Build complete skill object with all required fields
+                skill_obj = req.skill
                 severity_list.append({
-                    "skill_name": req.skill.name,
+                    "skill_id": req.skill_id,
+                    "skill": {
+                        "id": req.skill_id,
+                        "name": skill_obj.name if skill_obj else f"Skill {req.skill_id}",
+                        "description": skill_obj.description if skill_obj else "",
+                        "category_id": skill_obj.category_id if skill_obj else None,
+                        "demand_level": skill_obj.demand_level if skill_obj else 0
+                    },
+                    "skill_name": skill_obj.name if skill_obj else f"Skill {req.skill_id}",
                     "gap": gap,
                     "effective_gap": effective_gap,
                     "severity": severity,
                     "description": description,
-                    "inferred_bonus": inferred_bonus
+                    "inferred_bonus": inferred_bonus,
+                    "current_score": current_score,
+                    "required_score": required_score,
+                    "required_level": req.required_level
                 })
 
         return severity_list
+
 
     @staticmethod
     def _generate_explanation(

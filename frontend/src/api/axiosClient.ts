@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000';
+// Use environment variable if available, otherwise use nginx proxy path
+// For Docker/Production, use relative path '/api' which nginx will proxy
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,

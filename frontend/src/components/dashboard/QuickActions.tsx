@@ -26,7 +26,7 @@ export function QuickActions() {
       icon: Target,
       href: '/skill_selection',
       color: 'bg-blue-500/10 text-blue-600',
-      primary: !hasAssessments
+      primary: hasAssessments && !hasAssessments
     },
     {
       title: 'Explore Careers',
@@ -34,7 +34,7 @@ export function QuickActions() {
       icon: Briefcase,
       href: '/careers',
       color: 'bg-green-500/10 text-green-600',
-      primary: hasAssessments && !hasCareerMatches
+      primary: !hasCareerMatches
     },
     {
       title: 'Learning Path',

@@ -241,19 +241,19 @@ export function calculateCareerMatches(userSkills: UserSkill[]): CareerMatch[] {
     const matchScore = Math.round((matchedWeight / totalWeight) * 100);
     const matchedCount = requirements.length - gaps.length;
     
-    matches.push({
-      roleId: role.id,
-      role,
-      matchScore,
-      skillMatches: {
-        matched: matchedCount,
-        total: requirements.length,
-        percentage: Math.round((matchedCount / requirements.length) * 100),
-      },
-      gaps: gaps.sort((a, b) => b.priority - a.priority),
-      reasoning: generateMatchReasoning(matchScore, gaps, role),
-      estimatedTimeToQualify: estimateTimeToQualify(gaps),
-    });
+    // matches.push({
+    //   roleId: role.id,
+    //   role,
+    //   matchScore,
+    //   skillMatches: {
+    //     matched: matchedCount,
+    //     total: requirements.length,
+    //     percentage: Math.round((matchedCount / requirements.length) * 100),
+    //   },
+    //   gaps: gaps.sort((a, b) => b.priority - a.priority),
+    //   reasoning: generateMatchReasoning(matchScore, gaps, role),
+    //   estimatedTimeToQualify: estimateTimeToQualify(gaps),
+    // });
   }
   
   return matches.sort((a, b) => b.matchScore - a.matchScore);

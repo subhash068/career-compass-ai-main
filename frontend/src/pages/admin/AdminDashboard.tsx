@@ -17,8 +17,11 @@ import {
   LogOut,
   Menu,
   X,
-  FolderTree
+  FolderTree,
+  BookOpen,
+  GraduationCap
 } from 'lucide-react';
+
 
 import { cn } from '@/lib/utils';
 import axiosClient from '@/api/axiosClient';
@@ -33,6 +36,9 @@ import LogViewer from '@/components/admin/LogViewer';
 import CareerAnalytics from '@/components/admin/CareerAnalytics';
 import UserForm from '@/components/admin/UserForm';
 import DomainSkillsManager from '@/components/admin/DomainSkillsManager';
+import AdminLearningPaths from './AdminLearningPaths';
+import AdminLearningResources from './AdminLearningResources';
+
 
 
 interface SystemStats {
@@ -134,11 +140,14 @@ export default function AdminDashboard() {
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'users', label: 'User Management', icon: Users },
     { id: 'domains', label: 'Domain & Skills', icon: FolderTree },
+    { id: 'learning-paths', label: 'Learning Paths', icon: GraduationCap },
+    { id: 'learning-resources', label: 'Learning Resources', icon: BookOpen },
     { id: 'quiz', label: 'Quiz Management', icon: HelpCircle },
     { id: 'monitoring', label: 'System Monitor', icon: Activity },
     { id: 'logs', label: 'Logs & Errors', icon: FileText },
     { id: 'analytics', label: 'Career Analytics', icon: TrendingUp },
   ];
+
 
 
   return (
@@ -406,7 +415,18 @@ export default function AdminDashboard() {
               <DomainSkillsManager />
             </TabsContent>
 
+            {/* Learning Paths Tab */}
+            <TabsContent value="learning-paths">
+              <AdminLearningPaths />
+            </TabsContent>
+
+            {/* Learning Resources Tab */}
+            <TabsContent value="learning-resources">
+              <AdminLearningResources />
+            </TabsContent>
+
             {/* Quiz Tab */}
+
 
             <TabsContent value="quiz">
               <QuizManager />

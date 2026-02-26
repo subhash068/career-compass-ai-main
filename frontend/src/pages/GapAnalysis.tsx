@@ -13,12 +13,10 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { TrendingUp, AlertTriangle, CheckCircle2, ArrowRight, Loader2, Filter } from 'lucide-react';
+import { TrendingUp, AlertTriangle, CheckCircle2, ArrowRight, Loader2, Filter, Briefcase, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
 import { skillsApi } from '@/api/skills.api.ts';
-import { careerApi } from '@/api/career.api.ts';
 
 interface SkillGap {
   skillId: string;
@@ -30,10 +28,6 @@ interface SkillGap {
   gapScore: number;
   severity: 'low' | 'medium' | 'high' | 'none';
   priority: number;
-}
-
-interface CareerMatch {
-  [key: string]: any;
 }
 
 export default function GapAnalysis() {
@@ -167,16 +161,25 @@ export default function GapAnalysis() {
   const mediumGaps = uniqueGaps.filter(g => g?.severity === 'medium').length;
   const lowGaps = uniqueGaps.filter(g => g?.severity === 'low').length;
 
-  // Get all available domains from skillCategories for filter
-  const availableDomains = skillCategories.map(cat => cat.id);
+  // Get user's assessed domain from career matches
+  const userDomain = careerMatches?.[0]?.domain_name || 'General';
+  const userDomainId = careerMatches?.[0]?.domain_id || 'all';
+
+  // All career matches are now from the user's assessed domain only
+  const domainCareers = careerMatches?.slice(0, 5) || [];
+
+  // Get unique domains from actual gap data (dynamic, not mock data)
+  const availableDomains = Array.from(new Set(uniqueSkills.map(skill => skill?.skill?.categoryId).filter(Boolean)));
+
+  // Filter skills by selected domain (default to user's assessed domain)
+  const effectiveDomain = selectedDomain === 'all' ? userDomainId : selectedDomain;
   
-  // Filter skills by selected domain (show ALL skills for that domain, not just gaps)
-  const filteredSkills = selectedDomain === 'all' 
+  const filteredSkills = effectiveDomain === 'all' 
     ? uniqueSkills 
     : uniqueSkills.filter(skill => {
         // Handle both string and number comparison
         const skillDomain = String(skill?.skill?.categoryId || '');
-        const selectedDomainStr = String(selectedDomain);
+        const selectedDomainStr = String(effectiveDomain);
         return skillDomain === selectedDomainStr;
       });
 
@@ -228,9 +231,53 @@ export default function GapAnalysis() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Skill Gap Analysis</h1>
         <p className="text-muted-foreground">
-          Identify and prioritize skills to develop for your target careers
+          Based on your <span className="text-primary font-medium">{userDomain}</span> assessment • 
+          Showing gaps for careers in this domain
         </p>
       </div>
+
+      {/* Domain Career Matches */}
+      {domainCareers.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5" />
+              Career Matches for {userDomain}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Top career matches based on your {userDomain} skill assessment
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {domainCareers.map((match: any) => (
+                <div
+                  key={match.role_id || match.title}
+                  className="p-4 rounded-lg border border-primary bg-primary/5"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold">{match.title}</span>
+                    <span className={`text-sm font-medium ${
+                      match.match_percentage >= 70 ? 'text-success' :
+                      match.match_percentage >= 50 ? 'text-warning' : 'text-destructive'
+                    }`}>
+                      {match.match_percentage}%
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {match.level} • {match.domain_name || userDomain}
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{match.matched_count || 0} skills matched</span>
+                    <span>•</span>
+                    <span>{match.missing_count || 0} gaps to fill</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -287,7 +334,7 @@ export default function GapAnalysis() {
                 Gap Overview
               </CardTitle>
               
-              {/* Domain Filter */}
+              {/* Domain Filter - Dynamic based on user's assessed domain */}
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 <select
@@ -296,9 +343,14 @@ export default function GapAnalysis() {
                   className="text-sm border rounded-md px-2 py-1 bg-background"
                 >
                   <option value="all">All Domains</option>
-                  {skillCategories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
+                  {availableDomains.map(domainId => {
+                    const category = skillCategories.find(c => c.id === String(domainId));
+                    return (
+                      <option key={domainId} value={domainId}>
+                        {category?.name || `Domain ${domainId}`}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             </div>

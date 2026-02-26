@@ -10,6 +10,7 @@ from models.learning_path import LearningPath, LearningPathStepAssociation
 from models.learning_path_step import LearningPathStep
 from models.learning_resource import LearningResource
 from models.user_skill import UserSkill
+from models.skill_assessment import SkillAssessmentSkill, SkillAssessment
 from models.job_role import JobRole
 from models.role_skill_requirement import RoleSkillRequirement
 from models.skill import Skill
@@ -58,38 +59,71 @@ class LearningService:
                     db.flush()
 
 
-            requirements = db.query(RoleSkillRequirement).filter_by(
-                role_id=target_role_id
+            # Get user's latest skill assessments from SkillAssessmentSkill (correct scores)
+            from sqlalchemy import func
+            subquery = db.query(
+                SkillAssessmentSkill.skill_id,
+                func.max(SkillAssessmentSkill.id).label('max_id')
+            ).join(SkillAssessment).filter(
+                SkillAssessment.user_id == user_id
+            ).group_by(SkillAssessmentSkill.skill_id).subquery()
+            
+            latest_assessments = db.query(SkillAssessmentSkill).join(
+                subquery,
+                SkillAssessmentSkill.id == subquery.c.max_id
             ).all()
+            
+            # Build user skill map from assessment skills (correct scores)
+            user_skill_map = {ass.skill_id: ass for ass in latest_assessments}
+            
+            # Get user's assessed domain
+            latest_assessment = db.query(SkillAssessment).filter(
+                SkillAssessment.user_id == user_id
+            ).order_by(SkillAssessment.created_at.desc()).first()
+            
+            user_domain_id = latest_assessment.domain_id if latest_assessment else None
+            
+            # Get ALL skills in user's domain (not just role requirements)
+            domain_skills = []
+            if user_domain_id:
+                domain_skills = db.query(Skill).filter(
+                    Skill.domain_id == user_domain_id
+                ).all()
+            
+            # Fallback to UserSkill if no assessments found
+            if not user_skill_map:
+                user_skills = db.query(UserSkill).filter_by(user_id=user_id).all()
+                user_skill_map = {us.skill_id: us for us in user_skills}
 
-            # Validate requirements exist
-            if not requirements:
-                # Create a path with no steps - user needs to check career requirements
-                path = LearningPath(
-                    user_id=user_id,
-                    target_role_id=target_role_id,
-                    total_duration="0 weeks",
-                    progress=100,
-                )
-                db.add(path)
-                db.commit()
-                db.refresh(path)
-                return path.to_dict()
-
-            user_skills = db.query(UserSkill).filter_by(user_id=user_id).all()
-            user_skill_map = {us.skill_id: us for us in user_skills}
 
             # ------------------------------------------
-            # Identify gaps
+            # Identify gaps - ALL domain skills, not just role requirements
             # ------------------------------------------
             missing_skill_ids = []
-            for req in requirements:
-                user_skill = user_skill_map.get(req.skill_id)
+            
+            # First, check all domain skills for gaps
+            for skill in domain_skills:
+                user_skill = user_skill_map.get(skill.id)
                 current = user_skill.score if user_skill else 0
-                required = LearningService._level_to_score(req.required_level)
-
+                # Assume advanced level (75) as target for all domain skills
+                required = 75
+                
                 if current < required:
-                    missing_skill_ids.append(req.skill_id)
+                    missing_skill_ids.append(skill.id)
+            
+            # Also check role requirements (in case role has skills outside domain)
+            role_requirements = db.query(RoleSkillRequirement).filter_by(
+                role_id=target_role_id
+            ).all()
+            
+            for req in role_requirements:
+                if req.skill_id not in missing_skill_ids:
+                    user_skill = user_skill_map.get(req.skill_id)
+                    current = user_skill.score if user_skill else 0
+                    required = LearningService._level_to_score(req.required_level)
+                    
+                    if current < required:
+                        missing_skill_ids.append(req.skill_id)
 
             # User already qualified
             if not missing_skill_ids:
@@ -107,8 +141,17 @@ class LearningService:
             # ------------------------------------------
             # Enhanced dependency resolution with AI
             # ------------------------------------------
-            # Get skill importance weights from requirements
-            skill_weights = {req.skill_id: req.weight for req in requirements}
+            # Get skill importance weights
+            skill_weights = {}
+            for skill_id in missing_skill_ids:
+                # Check if it's a role requirement
+                req = next((r for r in role_requirements if r.skill_id == skill_id), None)
+                if req:
+                    skill_weights[skill_id] = req.weight
+                else:
+                    # Domain skill not in role requirements - default weight
+                    skill_weights[skill_id] = 0.5
+            
             dependencies = LearningService._build_dependency_graph(db, missing_skill_ids)
 
             # Use AI optimizer for better ordering
@@ -133,19 +176,25 @@ class LearningService:
             order = 1
 
             for skill_id in ordered_skill_ids:
-                # Find the requirement for this skill, skip if not found
-                req = next((r for r in requirements if r.skill_id == skill_id), None)
-                if not req:
-                    continue
-                    
                 user_skill = user_skill_map.get(skill_id)
+                
+                # Get requirement if it exists, otherwise use default
+                req = next((r for r in role_requirements if r.skill_id == skill_id), None)
+                
+                if req:
+                    required = LearningService._level_to_score(req.required_level)
+                    target_level = req.required_level
+                    skill_importance = req.weight
+                else:
+                    # Domain skill not in role requirements
+                    required = 75  # Advanced level default
+                    target_level = "advanced"
+                    skill_importance = 0.5
 
                 current = user_skill.score if user_skill else 0
-                required = LearningService._level_to_score(req.required_level)
                 gap = max(0, required - current)
 
                 # Use AI-enhanced duration estimation
-                skill_importance = skill_weights.get(skill_id, 1.0)
                 duration_result = LearningOptimizer.estimate_duration_with_difficulty(
                     gap, skill_importance=skill_importance
                 )
@@ -157,13 +206,13 @@ class LearningService:
                 skill_name = skill.name if skill else "Unknown Skill"
                 assessment_questions = LearningService._generate_assessment_questions(
                     skill_name,
-                    req.required_level,
+                    target_level,
                     gap
                 )
 
                 step = LearningPathStep(
                     skill_id=skill_id,
-                    target_level=req.required_level,
+                    target_level=target_level,
                     order=order,
                     estimated_duration=f"{weeks} weeks",
                     is_completed=False,
