@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def test_model_imports():
     """Test that all SQLAlchemy models can be imported"""

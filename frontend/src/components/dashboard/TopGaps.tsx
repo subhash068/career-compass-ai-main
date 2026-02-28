@@ -32,7 +32,9 @@ export function TopGaps() {
     // If missing_severity is available, use it for detailed info
     if (Array.isArray(match.missing_severity) && match.missing_severity.length > 0) {
       return match.missing_severity.map((item: any) => ({
-        skill: item?.skill || 'Unknown',
+        // Handle both string and object skill formats
+        // Object format: { id, name, description, category_id, demand_level }
+        skill: typeof item?.skill === 'object' ? item?.skill?.name || 'Unknown' : (item?.skill || 'Unknown'),
         severity: item?.severity || 'medium',
         priority: item?.priority || 5,
       }));
@@ -117,7 +119,7 @@ export function TopGaps() {
                 <TrendingUp className="w-4 h-4 text-warning" />
               </div>
               <div>
-                <span className="font-medium text-sm block">{gap.skill}</span>
+                <span className="font-medium text-sm block">{typeof gap.skill === 'object' ? gap.skill?.name : gap.skill}</span>
                 <span className="text-xs text-muted-foreground">Priority: {gap.priority}/10</span>
               </div>
             </div>

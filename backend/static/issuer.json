@@ -1,0 +1,22 @@
+{
+  "@context": "https://w3id.org/openbadges/v2",
+  "type": "Issuer",
+  "id": "https://careercompass.ai",
+  "name": "CareerCompass AI",
+  "url": "https://careercompass.ai",
+  "email": "badges@careercompass.ai",
+  "description": "CareerCompass AI - AI-Powered Career Development Platform providing professional certifications for technology roles",
+  "verification": {
+    "type": "hosted"
+  },
+  "issuerOrganization": {
+    "name": "CareerCompass AI",
+    "url": "https://careercompass.ai"
+  },
+  "badgeTypes": [
+    "DevOps Engineer",
+    "Full Stack Developer",
+    "Data Scientist",
+    "Cloud Architect"
+  ]
+}

@@ -21,8 +21,9 @@ export const learningApi = {
     return response.data;
   },
 
-  markStepComplete: async (pathId: number, stepId: number): Promise<void> => {
-    await axiosClient.post(`/learning/path/${pathId}/step/${stepId}/complete`);
+  markStepComplete: async (pathId: number, stepId: number): Promise<LearningPath> => {
+    const response = await axiosClient.post<LearningPath>(`/learning/path/${pathId}/step/${stepId}/complete`);
+    return response.data;
   },
 
   // Check if step can be completed (sequential + assessment requirements)

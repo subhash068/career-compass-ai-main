@@ -108,6 +108,11 @@ class LearningPathStep(Base):
         except Exception:
             dependencies = []
         
+        try:
+            assessment_questions = self.get_assessment_questions() if self.assessment_questions else []
+        except Exception:
+            assessment_questions = []
+        
         # Safely serialize skill information
         skill_dict = None
         try:
@@ -130,6 +135,8 @@ class LearningPathStep(Base):
             "estimated_duration": self.estimated_duration,
             "estimatedDuration": self.estimated_duration,  # camelCase for frontend
             "resources": resources,
+            "assessment_questions": assessment_questions,
+            "assessmentQuestions": assessment_questions,  # camelCase for frontend
             "dependencies": dependencies,
             "is_completed": self.is_completed,
             "isCompleted": self.is_completed,  # camelCase for frontend

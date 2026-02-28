@@ -62,6 +62,15 @@ class UpdateProfileRequest(BaseModel):
     phone: Optional[str] = None
     current_role: Optional[str] = None
 
+class SendOtpRequest(BaseModel):
+    email: str
+    purpose: str  # 'verify' or 'reset'
+
+class VerifyOtpRequest(BaseModel):
+    email: str
+    code: str
+    purpose: str  # 'verify' or 'reset'
+
 
 # --------------------------------------------------
 # AUTH DEPENDENCY
@@ -245,6 +254,39 @@ def reset_password(
             db=db,
             reset_token=request.reset_token,
             new_password=request.new_password,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# --------------------------------------------------
+# EMAIL OTP (verification & reset)
+# --------------------------------------------------
+@router.post("/send-otp", response_model=dict)
+def send_otp(
+    request: SendOtpRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        return AuthService.send_otp(
+            db=db,
+            email=request.email,
+            purpose=request.purpose,
+        )
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/verify-otp", response_model=dict)
+def verify_otp(
+    request: VerifyOtpRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        return AuthService.verify_otp(
+            db=db,
+            email=request.email,
+            code=request.code,
+            purpose=request.purpose,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

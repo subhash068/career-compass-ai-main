@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 import { 
   LayoutDashboard, 
   Users, 
@@ -19,12 +20,14 @@ import {
   X,
   FolderTree,
   BookOpen,
-  GraduationCap
+  GraduationCap,
+  MousePointerClick
 } from 'lucide-react';
 
 
 import { cn } from '@/lib/utils';
 import axiosClient from '@/api/axiosClient';
+
 
 // Import admin components
 import UserManagementTable from '@/components/admin/UserManagementTable';
@@ -51,11 +54,13 @@ interface SystemStats {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { user: contextUser, logout } = useAuth();
   
 
   
   // Check localStorage as fallback for immediate access after login
+
   let user = contextUser;
   if (!user) {
     const userStr = localStorage.getItem('user');
@@ -77,6 +82,10 @@ export default function AdminDashboard() {
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [rightClickProtection, setRightClickProtection] = useState(() => {
+    return localStorage.getItem('rightClickProtection') === 'true';
+  });
+
 
   // Fetch system stats
 
@@ -134,6 +143,44 @@ export default function AdminDashboard() {
     // Refresh user list if needed
     handleCloseUserForm();
   };
+
+  const toggleRightClickProtection = () => {
+    const newValue = !rightClickProtection;
+    setRightClickProtection(newValue);
+    
+    const strValue = newValue.toString();
+    
+    // Set in both localStorage and sessionStorage
+    localStorage.setItem('rightClickProtection', strValue);
+    sessionStorage.setItem('rightClickProtection', strValue);
+    
+    console.log('toggleRightClickProtection: Setting storage to:', newValue);
+    
+    // Dispatch custom event to notify other components of the change (without page reload)
+    window.dispatchEvent(new CustomEvent('rightClickProtectionChange', {
+      detail: { key: 'rightClickProtection', value: newValue }
+    }));
+    
+    // Use BroadcastChannel for cross-tab communication
+    try {
+      const broadcastChannel = new BroadcastChannel('rightClickProtection');
+      broadcastChannel.postMessage({ type: 'PROTECTION_CHANGE', value: newValue });
+      broadcastChannel.close();
+    } catch (e) {
+      console.log('BroadcastChannel not supported');
+    }
+    
+    // Show alert notification (toast not available in this component)
+    alert(newValue 
+      ? "Right-Click Protection Enabled\nRight-click context menu is now blocked across the entire application." 
+      : "Right-Click Protection Disabled\nRight-click context menu is now enabled."
+    );
+  };
+
+
+
+
+
 
 
   const navItems = [
@@ -365,6 +412,32 @@ export default function AdminDashboard() {
                     </Button>
                   </CardContent>
                 </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Security Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MousePointerClick className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">Right-Click Protection</span>
+                      </div>
+                      <Button
+                        variant={rightClickProtection ? "default" : "outline"}
+                        size="sm"
+                        onClick={toggleRightClickProtection}
+                        className={rightClickProtection ? "bg-green-600 hover:bg-green-700" : ""}
+                      >
+                        {rightClickProtection ? "Enabled" : "Disabled"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      When enabled, right-click context menu will be blocked across the entire application to prevent content copying and inspection.
+                    </p>
+                  </CardContent>
+                </Card>
+
 
                 <Card>
                   <CardHeader>

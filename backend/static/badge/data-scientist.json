@@ -1,0 +1,33 @@
+{
+  "@context": "https://w3id.org/openbadges/v2",
+  "type": "BadgeClass",
+  "id": "https://careercompass.ai/badge/data-scientist.json",
+  "name": "Data Scientist Professional Certification",
+  "description": "Professional certification for Data Scientist role. Holder has demonstrated competency in required skills through completion of AI-powered learning path and assessments.",
+  "image": "https://careercompass.ai/images/badge-data-scientist.png",
+  "criteria": {
+    "type": "Criteria",
+    "id": "https://careercompass.ai/criteria/data-scientist",
+    "narrative": "The recipient has successfully completed all required learning modules and assessments for the Data Scientist professional certification track. This includes demonstrating proficiency in all required skills through practical assessments and completing a final capstone project."
+  },
+  "issuer": "https://careercompass.ai",
+  "tags": [
+    "career",
+    "professional",
+    "certification",
+    "careercompass",
+    "data-scientist",
+    "data-science"
+  ],
+  "alignment": [
+    {
+      "targetName": "Data Scientist",
+      "targetUrl": "https://careercompass.ai/roles/data-scientist",
+      "targetDescription": "Professional certification for Data Scientist role"
+    }
+  ],
+  "validityPeriod": {
+    "type": "ValidityPeriod",
+    "months": 36
+  }
+}

@@ -1,30 +1,35 @@
 === CHECKING DATABASE ===
-Table 'users': 4 rows
-Table 'skills': 34 rows
-Table 'user_skills': 4 rows
-Table 'skill_assessments': 46 rows
-Table 'skill_assessment_skills': 5 rows
+Table 'users': 7 rows
+Table 'skills': 35 rows
+Table 'user_skills': 7 rows
+Table 'skill_assessments': 52 rows
+Table 'skill_assessment_skills': 7 rows
 
 --- Checking user bunnyoffical068@gmail.com ---
 Found user: ID=1, Email=bunnyoffical068@gmail.com
 User skills count: 0
 
 --- ALL USER_SKILLS WITH USER EMAILS ---
-Total user_skills with joins: 4
-  User 26 (innovative@gmail.com) - Python: score=17.9701, confidence=90
+Total user_skills with joins: 7
   User 26 (innovative@gmail.com) - Git: score=8.31005e-20, confidence=70
   User 26 (innovative@gmail.com) - Manual Testing: score=9.6196e-09, confidence=80
   User 26 (innovative@gmail.com) - Linux: score=100.0, confidence=100
+  User 26 (innovative@gmail.com) - Automation Testing: score=90.0, confidence=90
+  User 30 (bunnyoffical@gmail.com) - HTML: score=33.3333, confidence=33
+  User 26 (innovative@gmail.com) - Selenium: score=20.0, confidence=20
+  User 26 (innovative@gmail.com) - Bug Tracking: score=30.0, confidence=30
 
 --- SKILL_ASSESSMENT_SKILLS FOR USER 1 ---
 Total assessment skills for user 1: 0
 
 --- ALL SKILL_ASSESSMENT_SKILLS ---
-Total assessment skills: 5
+Total assessment skills: 7
+  User 26 (innovative@gmail.com) - Bug Tracking: score=30.0, level=beginner
+  User 26 (innovative@gmail.com) - Selenium: score=20.0, level=beginner
+  User 26 (innovative@gmail.com) - Automation Testing: score=90.0, level=advanced
   User 26 (innovative@gmail.com) - Linux: score=100.0, level=advanced
-  User 26 (innovative@gmail.com) - Python: score=90.0, level=advanced
-  User 26 (innovative@gmail.com) - Python: score=90.0, level=advanced
   User 26 (innovative@gmail.com) - Git: score=70.0, level=intermediate
   User 26 (innovative@gmail.com) - Manual Testing: score=80.0, level=advanced
+  User 30 (bunnyoffical@gmail.com) - HTML: score=33.3333, level=beginner
 
 === DONE ===

@@ -6,7 +6,7 @@ import os
 import sys
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
 from models.database import engine, IS_SQLITE, get_database_url

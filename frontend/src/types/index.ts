@@ -204,6 +204,132 @@ export interface LearningPath {
   progress: number; // 0-100
   createdAt: Date;
   updatedAt: Date;
+  // Certificate info when generated
+  certificate?: Certificate;
+  certificate_generated?: boolean;
+}
+
+export interface Certificate {
+  id: number;
+  user_id: number;
+  learning_path_id: number;
+  role_title: string;
+  user_name: string;
+  certificate_unique_id: string;
+  issued_at: string;
+  expiry_date?: string;
+  course_duration?: string;
+  completion_mode?: string;
+  skills_covered?: string;
+  final_assessment_score?: number;
+  performance_grade?: string;
+  project_completed?: boolean;
+  certificate_hash: string;
+  verification_url?: string;
+  qr_code?: string;
+  certificate_url?: string;
+  digital_signature?: string;
+  is_expired?: boolean;
+  // Open Badge fields
+  is_anchored?: boolean;
+  blockchain_network?: string;
+  blockchain_tx_id?: string;
+  blockchain_hash?: string;
+  blockchain_anchored_at?: string;
+  hash_algorithm?: string;
+}
+
+// Open Badge 2.0 Types
+export interface OpenBadgeIssuer {
+  "@context": string;
+  "type": string;
+  id: string;
+  name: string;
+  url: string;
+  email: string;
+  description?: string;
+  verification: {
+    type: string;
+  };
+}
+
+export interface OpenBadgeCriteria {
+  type: string;
+  id: string;
+  narrative: string;
+}
+
+export interface OpenBadgeAlignment {
+  targetName: string;
+  targetUrl: string;
+  targetDescription: string;
+}
+
+export interface OpenBadgeClass {
+  "@context": string;
+  "type": string;
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  criteria: OpenBadgeCriteria;
+  issuer: string;
+  tags?: string[];
+  alignment?: OpenBadgeAlignment[];
+  validityPeriod?: {
+    type: string;
+    months: number;
+  };
+}
+
+export interface OpenBadgeRecipient {
+  type: string;
+  hashed: boolean;
+  identity: string;
+}
+
+export interface OpenBadgeEvidence {
+  type: string;
+  id: string;
+  narrative: string;
+}
+
+export interface OpenBadgeVerification {
+  type: string;
+  anchored?: boolean;
+  blockchain?: string;
+  txId?: string;
+  url?: string;
+}
+
+export interface OpenBadgeAssertion {
+  "@context": string;
+  "type": string;
+  id: string;
+  recipient: OpenBadgeRecipient;
+  badge: string;
+  verification: OpenBadgeVerification;
+  issuedOn: string;
+  expires?: string;
+  evidence?: OpenBadgeEvidence[];
+  image?: string;
+  verify?: {
+    type: string;
+    url: string;
+  };
+}
+
+export interface OpenBadgePackage {
+  issuer: OpenBadgeIssuer;
+  badgeClass: OpenBadgeClass;
+  assertion: OpenBadgeAssertion;
+}
+
+export interface OpenBadgeResponse {
+  message: string;
+  package: OpenBadgePackage;
+  open_badge_version: string;
+  compatible_platforms: string[];
 }
 
 export interface ChatMessage {

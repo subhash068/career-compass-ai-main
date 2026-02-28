@@ -1,0 +1,210 @@
+services:
+  # =====================================================
+  # DATABASE & CACHE (Single instances)
+  # =====================================================
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=career_compass
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=kali
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p kali"]
+      timeout: 20s
+      retries: 10
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+  # =====================================================
+  # BACKEND API INSTANCES (Load Balanced)
+  # =====================================================
+  flask-api-1:
+    build: ./backend
+    environment:
+      - MYSQL_URI=mysql+mysqlconnector://root:kali@mysql:3306/career_compass
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - INSTANCE_ID=flask-api-1
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  flask-api-2:
+    build: ./backend
+    environment:
+      - MYSQL_URI=mysql+mysqlconnector://root:kali@mysql:3306/career_compass
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - INSTANCE_ID=flask-api-2
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  flask-api-3:
+    build: ./backend
+    environment:
+      - MYSQL_URI=mysql+mysqlconnector://root:kali@mysql:3306/career_compass
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - INSTANCE_ID=flask-api-3
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =====================================================
+  # FRONTEND INSTANCES (Load Balanced)
+  # =====================================================
+  frontend-1:
+    build: ./frontend
+    environment:
+      - VITE_API_URL=/api
+      - INSTANCE_ID=frontend-1
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend-2:
+    build: ./frontend
+    environment:
+      - VITE_API_URL=/api
+      - INSTANCE_ID=frontend-2
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =====================================================
+  # MONITORING
+  # =====================================================
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - app-network
+
+  # =====================================================
+  # LOAD BALANCER (NGINX)
+  # =====================================================
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "8080:8080"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx-loadbalancer.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - flask-api-1
+      - flask-api-2
+      - flask-api-3
+      - frontend-1
+      - frontend-2
+    networks:
+      - app-network
+
+  # =====================================================
+  # NGROK (Tunnel)
+  # =====================================================
+  ngrok:
+    image: ngrok/ngrok:latest
+    command: http nginx:80 --domain=career-compass-ai.ngrok.io
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    ports:
+      - "4040:4040"
+    depends_on:
+      - nginx
+    networks:
+      - app-network
+
+  # =====================================================
+  # AUTO-SCALING (Optional - using Docker Swarm or K8s)
+  # For Docker Compose, use 'docker-compose up --scale'
+  # =====================================================
+
+volumes:
+  mysql_data:
+  redis_data:
+  grafana_data:
+
+networks:
+  app-network:
+    driver: bridge

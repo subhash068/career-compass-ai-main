@@ -2,8 +2,11 @@ import sys
 import os
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+
 
 # Add backend directory to sys.path
 backend_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +28,7 @@ from models.chat_session import ChatSession
 from models.chat_message import ChatMessage
 from models.skill_assessment import SkillAssessment
 from models.user_skill import UserSkill
+from models.certificate import Certificate
 
 # Routers
 from routes import auth_fastapi as auth
@@ -40,8 +44,7 @@ from routes.admin_logs import router as admin_logs_router
 from routes.admin_domains import router as admin_domains_router
 from routes.user_notes import router as user_notes_router
 from routes.resume import router as resume_router
-
-
+from routes.certificate import router as certificate_router
 
 
 
@@ -104,6 +107,35 @@ app.include_router(admin_logs_router, tags=["Admin Logs"])
 app.include_router(admin_domains_router, tags=["Admin Domains & Skills"])
 app.include_router(user_notes_router, tags=["User Notes"])
 app.include_router(resume_router, tags=["Resumes"])
+app.include_router(certificate_router, tags=["Certificate"])
+
+
+# -----------------------------
+# Static files for Open Badges
+# -----------------------------
+# Serve badge JSON files
+@app.get("/badge/{badge_name}.json")
+async def get_badge_json(badge_name: str):
+    """Serve badge class JSON files for Open Badges"""
+    badge_path = os.path.join(backend_dir, "static", "badge", f"{badge_name}.json")
+    if os.path.exists(badge_path):
+        return FileResponse(badge_path, media_type="application/json")
+    return {"error": "Badge not found"}
+
+
+# -----------------------------
+# Open Badge verification endpoints
+# -----------------------------
+@app.get("/.well-known/issuer.json")
+async def get_issuer_well_known():
+    """Serve issuer metadata for Open Badges"""
+    issuer_path = os.path.join(backend_dir, "static", "issuer.json")
+    if os.path.exists(issuer_path):
+        return FileResponse(issuer_path, media_type="application/json")
+    # Fallback to dynamic response
+    from services.open_badge_service import OpenBadgeService
+    return OpenBadgeService.get_well_known_issuer()
+
 
 
 # -----------------------------

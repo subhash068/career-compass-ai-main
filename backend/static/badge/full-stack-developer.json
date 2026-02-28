@@ -1,0 +1,33 @@
+{
+  "@context": "https://w3id.org/openbadges/v2",
+  "type": "BadgeClass",
+  "id": "https://careercompass.ai/badge/full-stack-developer.json",
+  "name": "Full Stack Developer Professional Certification",
+  "description": "Professional certification for Full Stack Developer role. Holder has demonstrated competency in required skills through completion of AI-powered learning path and assessments.",
+  "image": "https://careercompass.ai/images/badge-full-stack-developer.png",
+  "criteria": {
+    "type": "Criteria",
+    "id": "https://careercompass.ai/criteria/full-stack-developer",
+    "narrative": "The recipient has successfully completed all required learning modules and assessments for the Full Stack Developer professional certification track. This includes demonstrating proficiency in all required skills through practical assessments and completing a final capstone project."
+  },
+  "issuer": "https://careercompass.ai",
+  "tags": [
+    "career",
+    "professional",
+    "certification",
+    "careercompass",
+    "full-stack",
+    "developer"
+  ],
+  "alignment": [
+    {
+      "targetName": "Full Stack Developer",
+      "targetUrl": "https://careercompass.ai/roles/full-stack-developer",
+      "targetDescription": "Professional certification for Full Stack Developer role"
+    }
+  ],
+  "validityPeriod": {
+    "type": "ValidityPeriod",
+    "months": 36
+  }
+}

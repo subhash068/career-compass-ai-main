@@ -1,28 +1,20 @@
-# Gap Analysis Fix - TODO
+# Blockchain Certificate Anchoring - Implementation TODO
 
-## Task: Fix gap analysis to include unattempted domain skills as 100% gaps
+## Phase 1: Database & Model Updates
+- [x] 1.1 Update requirements.txt with web3 dependency
+- [x] 1.2 Create migration 009_add_blockchain_fields.py
+- [x] 1.3 Update Certificate model with blockchain fields
 
-### Steps:
-- [x] Step 1: Modify `backend/services/skills_service.py` - Include unattempted domain skills in gap analysis
-- [x] Step 2: Modify `backend/services/career_service.py` - Account for unattempted skills in career matching
-- [x] Step 3: Implementation complete - ready for testing
+## Phase 2: Backend Service
+- [x] 2.1 Create blockchain_service.py
+- [x] 2.2 Update certificate routes with blockchain endpoints
+- [x] 2.3 Update verification to check blockchain
 
+## Phase 3: Frontend Updates
+- [x] 3.1 Update VerifyCertificate.tsx with blockchain display
 
-
-### Details:
-
-**Step 1: skills_service.py changes:**
-- Get user's assessed domain ID from latest assessment
-- Query ALL skills in that domain
-- For unattempted skills: create gap with 100% gap score, HIGH severity
-- Combine attempted and unattempted skills in gap analysis
-
-**Step 2: career_service.py changes:**
-- Get all domain skills (not just attempted)
-- For role requirements, treat unattempted skills as missing
-- Lower career match percentages when skills are unattempted
-
-**Expected Result:**
-- Frontend domain with 6 skills, user attempts 2 and fails both
-- Gap analysis shows: 6 gaps (2 failed + 4 unattempted) = 100% gap
-- Career matches reflect lower percentages due to unattempted skills
+## Phase 4: Testing (Manual Steps)
+- [ ] 4.1 Run migration: python run_migration.py
+- [ ] 4.2 Install dependencies: pip install web3 eth-account
+- [ ] 4.3 Test certificate generation with blockchain anchoring
+- [ ] 4.4 Test verification flow

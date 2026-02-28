@@ -10,7 +10,7 @@ import hashlib
 from unittest.mock import Mock, patch
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import all models to ensure SQLAlchemy mappers are configured
 from models.user_skill import UserSkill

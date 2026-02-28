@@ -29,6 +29,24 @@ export interface ProfileResponse {
   role: 'user' | 'admin';
 }
 
+export type OtpPurpose = 'verify' | 'reset';
+
+export interface SendOtpRequest {
+  email: string;
+  purpose: OtpPurpose;
+}
+
+export interface VerifyOtpRequest {
+  email: string;
+  code: string;
+  purpose: OtpPurpose;
+}
+
+export interface VerifyOtpResponse {
+  message: string;
+  reset_token?: string;
+}
+
 export const authApi = {
   login: async (data: LoginRequest): Promise<AuthResponse> => {
     const response = await axiosClient.post<AuthResponse>('/auth/login', data);
@@ -57,6 +75,16 @@ export const authApi = {
     const response = await axiosClient.post<{ access_token: string }>('/auth/refresh', {
       refresh_token: refreshToken,
     });
+    return response.data;
+  },
+
+  sendOtp: async (data: SendOtpRequest): Promise<{ message: string }> => {
+    const response = await axiosClient.post<{ message: string }>('/auth/send-otp', data);
+    return response.data;
+  },
+
+  verifyOtp: async (data: VerifyOtpRequest): Promise<VerifyOtpResponse> => {
+    const response = await axiosClient.post<VerifyOtpResponse>('/auth/verify-otp', data);
     return response.data;
   },
 };

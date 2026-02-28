@@ -1,5 +1,5 @@
 python-jose[cryptography]==3.3.0
-
+qrcode[pil]==8.2
 bcrypt==4.0.1
 scikit-learn>=1.5.0
 numpy>=2.0.0
@@ -22,3 +22,5 @@ xlsxwriter
 PyPDF2>=3.0.0
 python-docx>=0.8.11
 python-multipart>=0.0.6
+web3>=6.11.0
+eth-account>=0.9.0

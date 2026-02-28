@@ -39,6 +39,9 @@ class AISettings:
     ENABLE_MEMORY: bool = os.getenv("ENABLE_MEMORY", "true").lower() == "true"
     MEMORY_MAX_HISTORY: int = int(os.getenv("MEMORY_MAX_HISTORY", "10"))
 
+    # Skill Inference Settings
+    SKILL_INFERENCE_THRESHOLD: float = float(os.getenv("SKILL_INFERENCE_THRESHOLD", "0.6"))
+
     @classmethod
     def is_ai_enabled(cls) -> bool:
         """Check if any AI features are enabled."""

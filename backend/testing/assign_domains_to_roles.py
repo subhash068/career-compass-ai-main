@@ -3,7 +3,7 @@ Script to assign domains to existing job roles based on their titles.
 """
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.database import SessionLocal
 from models.job_role import JobRole

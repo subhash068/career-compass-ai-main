@@ -1,0 +1,33 @@
+{
+  "@context": "https://w3id.org/openbadges/v2",
+  "type": "BadgeClass",
+  "id": "https://careercompass.ai/badge/devops-engineer.json",
+  "name": "DevOps Engineer Professional Certification",
+  "description": "Professional certification for DevOps Engineer role. Holder has demonstrated competency in required skills through completion of AI-powered learning path and assessments.",
+  "image": "https://careercompass.ai/images/badge-devops-engineer.png",
+  "criteria": {
+    "type": "Criteria",
+    "id": "https://careercompass.ai/criteria/devops-engineer",
+    "narrative": "The recipient has successfully completed all required learning modules and assessments for the DevOps Engineer professional certification track. This includes demonstrating proficiency in all required skills through practical assessments and completing a final capstone project."
+  },
+  "issuer": "https://careercompass.ai",
+  "tags": [
+    "career",
+    "professional",
+    "certification",
+    "careercompass",
+    "devops",
+    "engineer"
+  ],
+  "alignment": [
+    {
+      "targetName": "DevOps Engineer",
+      "targetUrl": "https://careercompass.ai/roles/devops-engineer",
+      "targetDescription": "Professional certification for DevOps Engineer role"
+    }
+  ],
+  "validityPeriod": {
+    "type": "ValidityPeriod",
+    "months": 36
+  }
+}

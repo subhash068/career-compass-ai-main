@@ -5,7 +5,7 @@ import sys
 import os
 
 # Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def create_resumes_table():
     """Create the resumes table using SQLAlchemy ORM"""

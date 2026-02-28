@@ -189,21 +189,28 @@ export default function AdminLearningPaths() {
       const resources = stepFormData.resources ? JSON.parse(stepFormData.resources) : [];
       const assessmentQuestions = stepFormData.assessment_questions ? JSON.parse(stepFormData.assessment_questions) : [];
       
-      // If adding new step, include skill_name
-      const updateData: any = {
-        target_level: stepFormData.target_level,
-        estimated_duration: stepFormData.estimated_duration,
-        resources: resources,
-        assessment_questions: assessmentQuestions
-      };
-      
-      if (isAddingNewStep && stepFormData.skill_name) {
-        updateData.skill_name = stepFormData.skill_name;
-        // For new steps, we might need to call a create endpoint instead of update
-        // This depends on your backend API implementation
+      if (isAddingNewStep) {
+        // Create new step using POST endpoint
+        const createData: any = {
+          skill_name: stepFormData.skill_name,
+          target_level: stepFormData.target_level,
+          estimated_duration: stepFormData.estimated_duration,
+          resources: resources,
+          assessment_questions: assessmentQuestions
+        };
+        
+        await adminApi.createLearningStep(selectedPath.id, createData);
+      } else {
+        // Update existing step using PUT endpoint
+        const updateData: any = {
+          target_level: stepFormData.target_level,
+          estimated_duration: stepFormData.estimated_duration,
+          resources: resources,
+          assessment_questions: assessmentQuestions
+        };
+        
+        await adminApi.updateLearningStep(selectedPath.id, editingStep.id, updateData);
       }
-      
-      await adminApi.updateLearningStep(selectedPath.id, editingStep.id, updateData);
       
       toast({
         title: 'Success',
@@ -224,6 +231,29 @@ export default function AdminLearningPaths() {
     }
   };
 
+  const handleDeleteStep = async (stepId: number) => {
+    if (!selectedPath) return;
+    
+    if (!confirm('Are you sure you want to delete this learning step?')) {
+      return;
+    }
+
+    try {
+      await adminApi.deleteLearningStep(selectedPath.id, stepId);
+      toast({
+        title: 'Success',
+        description: 'Learning step deleted successfully',
+      });
+      fetchPathDetails(selectedPath.id);
+    } catch (error) {
+      console.error('Error deleting step:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete learning step',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const openEditStepDialog = (step: LearningStep) => {
     setIsAddingNewStep(false);
@@ -267,11 +297,16 @@ export default function AdminLearningPaths() {
     return 'bg-blue-500';
   };
 
-  const getStatusBadge = (progress: number) => {
-    if (progress === 0) return { label: 'Not Started', variant: 'secondary' as const };
-    if (progress === 100) return { label: 'Completed', variant: 'default' as const };
-    return { label: 'In Progress', variant: 'outline' as const };
+  const getStatusBadge = (progress: number): { label: string; variant: 'secondary' | 'default' | 'outline' } => {
+    if (progress === 0) {
+      return { label: 'Not Started', variant: 'secondary' };
+    }
+    if (progress === 100) {
+      return { label: 'Completed', variant: 'default' };
+    }
+    return { label: 'In Progress', variant: 'outline' };
   };
+
 
   const filteredPaths = paths.filter(path => {
     const matchesSearch = path.target_role?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -285,12 +320,18 @@ export default function AdminLearningPaths() {
     return matchesSearch && matchesFilter;
   });
 
+  const totalCount = paths.length;
+  const completedCount = paths.filter(p => p.progress === 100).length;
+  const inProgressCount = paths.filter(p => p.progress > 0 && p.progress < 100).length;
+  const notStartedCount = paths.filter(p => p.progress === 0).length;
+
   const stats = {
-    total: paths.length,
-    completed: paths.filter(p => p.progress === 100).length,
-    inProgress: paths.filter(p => p.progress > 0 && p.progress < 100).length,
-    notStarted: paths.filter(p => p.progress === 0).length,
+    total: totalCount,
+    completed: completedCount,
+    inProgress: inProgressCount,
+    notStarted: notStartedCount,
   };
+
 
   if (loading) {
     return (
@@ -525,14 +566,25 @@ export default function AdminLearningPaths() {
                                                   </p>
                                                 </div>
                                               </div>
-                                              <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => openEditStepDialog(step)}
-                                              >
-                                                <Edit3 className="w-4 h-4 mr-1" />
-                                                Edit
-                                              </Button>
+                                              <div className="flex items-center gap-2">
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() => openEditStepDialog(step)}
+                                                >
+                                                  <Edit3 className="w-4 h-4 mr-1" />
+                                                  Edit
+                                                </Button>
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() => handleDeleteStep(step.id)}
+                                                  className="text-destructive hover:bg-destructive/10"
+                                                >
+                                                  <Trash2 className="w-4 h-4 mr-1" />
+                                                  Delete
+                                                </Button>
+                                              </div>
                                             </div>
                                           </CardContent>
                                         </Card>
@@ -697,14 +749,25 @@ export default function AdminLearningPaths() {
                                                       </p>
                                                     </div>
                                                   </div>
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => openEditStepDialog(step)}
-                                                  >
-                                                    <Edit3 className="w-4 h-4 mr-1" />
-                                                    Edit
-                                                  </Button>
+                                                  <div className="flex items-center gap-2">
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
+                                                      onClick={() => openEditStepDialog(step)}
+                                                    >
+                                                      <Edit3 className="w-4 h-4 mr-1" />
+                                                      Edit
+                                                    </Button>
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
+                                                      onClick={() => handleDeleteStep(step.id)}
+                                                      className="text-destructive hover:bg-destructive/10"
+                                                    >
+                                                      <Trash2 className="w-4 h-4 mr-1" />
+                                                      Delete
+                                                    </Button>
+                                                  </div>
                                                 </div>
                                               </CardContent>
                                             </Card>

@@ -24,6 +24,7 @@ from .user import User
 from .user_skill import UserSkill
 from .user_note import UserNote
 from .resume import Resume
+from .certificate import Certificate
 
 __all__ = [
     "Base",
@@ -35,7 +36,6 @@ __all__ = [
     "UserSkill",
     "UserNote",
     "Resume",
-
     "Skill",
     "SkillQuestion",
     "Domain",
@@ -52,4 +52,5 @@ __all__ = [
     "SkillAssessment",
     "LearningPathStepAssociation",
     "SkillAssessmentSkill",
+    "Certificate",
 ]

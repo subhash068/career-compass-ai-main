@@ -27,6 +27,18 @@ export const adminApi = {
     return response.data;
   },
 
+  deleteLearningStep: async (pathId: number, stepId: number) => {
+    const response = await axiosClient.delete(`/admin/learning-paths/${pathId}/steps/${stepId}`);
+    return response.data;
+  },
+
+
+  createLearningStep: async (pathId: number, stepData: any) => {
+    const response = await axiosClient.post(`/admin/learning-paths/${pathId}/steps`, stepData);
+    return response.data;
+  },
+
+
   // Learning Resources
   getLearningResources: async (skillId?: number) => {
     const params = skillId ? { skill_id: skillId } : {};

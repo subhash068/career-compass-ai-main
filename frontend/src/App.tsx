@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -38,6 +38,7 @@ const Notes = React.lazy(() => import("@/pages/Notes"));
 const Resumes = React.lazy(() => import("@/pages/Resumes"));
 const ResumeBuilder = React.lazy(() => import("@/pages/ResumeBuilder"));
 const ATSChecker = React.lazy(() => import("@/pages/ATSChecker"));
+const VerifyCertificate = React.lazy(() => import("@/pages/VerifyCertificate"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 
@@ -58,6 +59,102 @@ const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Global right-click prevention component
+const GlobalContextMenuBlocker = ({ children }: { children: React.ReactNode }) => {
+  // Use state to track protection status reactively
+  const [protectionEnabled, setProtectionEnabled] = useState<boolean>(() => {
+    // Check sessionStorage first, then localStorage
+    const sessionValue = sessionStorage.getItem('rightClickProtection');
+    if (sessionValue !== null) {
+      return sessionValue === 'true';
+    }
+    const localValue = localStorage.getItem('rightClickProtection');
+    return localValue === 'true';
+  });
+
+  useEffect(() => {
+    console.log('GlobalContextMenuBlocker: Mounted, protection is:', protectionEnabled);
+    
+    // Check current protection status
+    const checkProtection = (): boolean => {
+      // Check sessionStorage first
+      const sessionVal = sessionStorage.getItem('rightClickProtection');
+      if (sessionVal !== null) {
+        return sessionVal === 'true';
+      }
+      // Then localStorage
+      const localVal = localStorage.getItem('rightClickProtection');
+      const result = localVal === 'true';
+      console.log('GlobalContextMenuBlocker: localStorage check:', localVal, 'result:', result);
+      return result;
+    };
+
+    // Prevent right-click context menu
+    const preventContextMenu = (e: MouseEvent) => {
+      const isEnabled = checkProtection();
+      console.log('GlobalContextMenuBlocker: Right-click blocked check, enabled:', isEnabled);
+      
+      if (isEnabled) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    // Add event listener with useCapture = true
+    document.addEventListener('contextmenu', preventContextMenu, true);
+
+    // Listen for custom events from admin panel
+    const handleProtectionChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.key === 'rightClickProtection') {
+        console.log('GlobalContextMenuBlocker: Custom event received, value:', customEvent.detail.value);
+        setProtectionEnabled(customEvent.detail.value);
+        sessionStorage.setItem('rightClickProtection', customEvent.detail.value.toString());
+        localStorage.setItem('rightClickProtection', customEvent.detail.value.toString());
+      }
+    };
+    window.addEventListener('rightClickProtectionChange', handleProtectionChange);
+
+    // BroadcastChannel for cross-tab communication
+    let broadcastChannel: BroadcastChannel | null = null;
+    try {
+      broadcastChannel = new BroadcastChannel('rightClickProtection');
+      broadcastChannel.onmessage = (event) => {
+        if (event.data.type === 'PROTECTION_CHANGE') {
+          console.log('GlobalContextMenuBlocker: BroadcastChannel message received:', event.data.value);
+          setProtectionEnabled(event.data.value);
+          sessionStorage.setItem('rightClickProtection', event.data.value.toString());
+          localStorage.setItem('rightClickProtection', event.data.value.toString());
+        }
+      };
+    } catch (e) {
+      console.log('BroadcastChannel not supported');
+    }
+
+    // Poll storage every 2 seconds for changes
+    const pollInterval = setInterval(() => {
+      const isEnabled = checkProtection();
+      if (isEnabled !== protectionEnabled) {
+        console.log('GlobalContextMenuBlocker: Poll detected change:', isEnabled);
+        setProtectionEnabled(isEnabled);
+      }
+    }, 2000);
+
+    return () => {
+      console.log('GlobalContextMenuBlocker: Cleanup');
+      document.removeEventListener('contextmenu', preventContextMenu, true);
+      window.removeEventListener('rightClickProtectionChange', handleProtectionChange);
+      if (broadcastChannel) {
+        broadcastChannel.close();
+      }
+      clearInterval(pollInterval);
+    };
+  }, [protectionEnabled]);
+
+  return <>{children}</>;
+};
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -66,6 +163,7 @@ const App = () => (
           <ChatProvider>
             <AuthProvider>
               <ThemeProvider>
+                <GlobalContextMenuBlocker>
                 <Toaster />
                 <Sonner />
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -125,12 +223,14 @@ const App = () => (
                             <AdminDashboard />
                           </ProtectedRoute>
                         } />
+                        <Route path="/verify/:certificateId" element={<VerifyCertificate />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </Suspense>
                     </MainLayout>
                   </AuthWrapper>
                 </BrowserRouter>
+                </GlobalContextMenuBlocker>
               </ThemeProvider>
             </AuthProvider>
           </ChatProvider>

@@ -4,7 +4,7 @@ Test script to verify the learning path generation is working correctly.
 """
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy.orm import Session
 from models.database import SessionLocal, engine

@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/auth/AuthContext';
-import { authApi } from '@/api/auth.api';
+import { authApi, AuthResponse } from '@/api/auth.api';
 import { LogIn, UserPlus, Check, X, Mail, Shield, Clock, Eye, EyeOff } from 'lucide-react';
 
 
@@ -27,7 +27,6 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
-  const [demoOtp, setDemoOtp] = useState('');
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -37,6 +36,7 @@ export default function Login() {
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
   const [newPasswordFocused, setNewPasswordFocused] = useState(false);
   const [confirmNewPasswordFocused, setConfirmNewPasswordFocused] = useState(false);
+  const [pendingAuth, setPendingAuth] = useState<AuthResponse | null>(null);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -86,17 +86,13 @@ export default function Login() {
     }
   }, [resendTimer]);
 
-  // Generate demo OTP
+  // Resend starts countdown
   useEffect(() => {
-    if (mode === 'verify') {
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setDemoOtp(generatedOtp);
-      toast({
-        title: "Verification Code Sent",
-        description: `Demo OTP: ${generatedOtp} (Check the notification)`,
-      });
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
     }
-  }, [mode, toast]);
+  }, [resendTimer]);
 
   const handleOtpChange = (index: number, value: string) => {
     if (value.length > 1) return;
@@ -139,7 +135,15 @@ export default function Login() {
         }
 
         try {
-          await authApi.register({ email, name, password });
+          const reg = await authApi.register({ email, name, password });
+          // Save pending auth info until email verification completes
+          setPendingAuth(reg);
+          // Send real OTP via backend
+          await authApi.sendOtp({ email, purpose: 'verify' });
+          toast({
+            title: "Verification Code Sent",
+            description: `A 6-digit code has been sent to ${email}.`,
+          });
           setMode('verify');
           setResendTimer(30);
         } catch (err) {
@@ -212,36 +216,38 @@ export default function Login() {
           return;
         }
 
-        // For demo purposes, accept the generated OTP
-        if (otpCode === demoOtp) {
-          // Simulate successful verification
-          const user = { id: 1, name, email };
-          localStorage.setItem('authToken', 'demo-token-' + Date.now());
-          localStorage.setItem('user', JSON.stringify(user));
-
-          // Dispatch custom event to notify AuthWrapper of auth change
+        try {
+          await authApi.verifyOtp({ email, code: otpCode, purpose: 'verify' });
+          // On success, persist tokens/user from register response
+          if (pendingAuth) {
+            localStorage.setItem('authToken', pendingAuth.access_token);
+            if (pendingAuth.refresh_token) {
+              localStorage.setItem('refreshToken', pendingAuth.refresh_token);
+            }
+            localStorage.setItem('user', JSON.stringify(pendingAuth.user));
+          }
+          // Notify app
           window.dispatchEvent(new CustomEvent('authChange'));
-
           toast({
             title: "Account Verified",
-            description: `Welcome to Career AI, ${name}!`,
+            description: `Welcome to Career Compass, ${name}!`,
           });
-
-          navigate('/');
-        } else {
+          navigate('/dashboard');
+        } catch (err) {
           setError('Invalid verification code. Please try again.');
         }
       } else if (mode === 'forgotPassword') {
-        // Generate demo reset code
-        setResetToken('demo-token-' + Date.now());
-        setMode('resetPassword');
-        setOtp(['', '', '', '', '', '']);
-        const newDemoOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        setDemoOtp(newDemoOtp);
-        toast({
-          title: "Reset Code Sent",
-          description: `Demo reset code: ${newDemoOtp}`,
-        });
+        try {
+          await authApi.sendOtp({ email, purpose: 'reset' });
+          toast({
+            title: "Reset Code Sent",
+            description: `A 6-digit code has been sent to ${email}.`,
+          });
+          setMode('resetPassword');
+          setOtp(['', '', '', '', '', '']);
+        } catch (err) {
+          setError('Failed to send reset code. Please try again.');
+        }
       } else if (mode === 'resetPassword') {
         const otpCode = otp.join('');
         if (otpCode.length !== 6) {
@@ -265,8 +271,10 @@ export default function Login() {
           return;
         }
 
-        // For demo purposes, accept the generated OTP
-        if (otpCode === demoOtp) {
+        try {
+          const { reset_token } = await authApi.verifyOtp({ email, code: otpCode, purpose: 'reset' });
+          if (!reset_token) throw new Error('Missing reset token');
+          await authApi.resetPassword(reset_token, newPassword);
           toast({
             title: "Password Reset Successful",
             description: "You can now sign in with your new password.",
@@ -276,7 +284,7 @@ export default function Login() {
           setNewPassword('');
           setConfirmNewPassword('');
           setOtp(['', '', '', '', '', '']);
-        } else {
+        } catch (err) {
           setError('Invalid reset code. Please try again.');
         }
       }
@@ -287,17 +295,19 @@ export default function Login() {
     }
   };
 
-  const handleResendOtp = () => {
-    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setDemoOtp(newOtp);
-    setResendTimer(30);
-    setOtp(['', '', '', '', '', '']);
-    otpRefs.current[0]?.focus();
-
-    toast({
-      title: "New Code Sent",
-      description: `Demo OTP: ${newOtp}`,
-    });
+  const handleResendOtp = async () => {
+    try {
+      await authApi.sendOtp({ email, purpose: mode === 'verify' ? 'verify' : 'reset' });
+      setResendTimer(30);
+      setOtp(['', '', '', '', '', '']);
+      otpRefs.current[0]?.focus();
+      toast({
+        title: "New Code Sent",
+        description: `A new code has been sent to ${email}.`,
+      });
+    } catch (err) {
+      setError('Failed to resend code. Please try again.');
+    }
   };
 
   const renderLoginForm = () => (
@@ -628,12 +638,7 @@ export default function Login() {
           </div>
 
           {/* Demo Email Inbox */}
-          <Alert>
-            <Mail className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Demo Email:</strong> Verification code: <code className="bg-muted px-1 rounded">{demoOtp}</code>
-            </AlertDescription>
-          </Alert>
+          {/* Real email is sent; no inline demo code */}
 
           {error && (
             <Alert variant="destructive">
@@ -775,12 +780,7 @@ export default function Login() {
             </div>
 
             {/* Demo Reset Code */}
-            <Alert>
-              <Mail className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Demo Reset Code:</strong> <code className="bg-muted px-1 rounded">{demoOtp}</code>
-              </AlertDescription>
-            </Alert>
+            {/* Real email is sent; no inline demo code */}
 
             <div className="space-y-2">
               <Label htmlFor="newPassword">New Password</Label>

@@ -4,8 +4,8 @@ Test script to verify the explanation field fix
 import sys
 import os
 
-# Add the backend directory to the path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add the backend directory to the path (go up one level from testing folder)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     # Test 1: Import the model

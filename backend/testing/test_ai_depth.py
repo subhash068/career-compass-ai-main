@@ -9,7 +9,7 @@ import os
 from unittest.mock import Mock, patch
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Mock database for testing
 class MockSkill:

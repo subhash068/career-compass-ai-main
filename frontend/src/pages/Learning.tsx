@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { SkillBadge } from '@/components/ui/skill-badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StepAssessmentModal } from '@/components/learning/StepAssessmentModal';
+import { CertificateDisplay } from '@/components/learning/CertificateDisplay';
 import { 
   GraduationCap, 
   Clock, 
@@ -27,7 +28,8 @@ import {
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { learningApi } from '@/api/learning.api.ts';
-import type { LearningResource, LearningPath, CareerMatch, LearningPathStep } from '@/types';
+import { certificateApi } from '@/api/certificate.api';
+import type { LearningResource, LearningPath, CareerMatch, LearningPathStep, Certificate } from '@/types';
 
 const resourceIcons: Record<LearningResource['type'], React.ComponentType<{ className?: string }>> = {
   course: GraduationCap,
@@ -56,6 +58,10 @@ export default function Learning() {
     previousCompleted: boolean;
     assessmentPassed: boolean;
   }>>({});
+  
+  // Certificate modal state
+  const [showCertificate, setShowCertificate] = useState(false);
+  const [certificate, setCertificate] = useState<Certificate | null>(null);
   
   // Assessment modal state
   const [assessmentModalOpen, setAssessmentModalOpen] = useState(false);
@@ -93,12 +99,17 @@ export default function Learning() {
           
           // Fetch step statuses for the new path
           await fetchStepStatuses(pathData);
+          
+          // Check if there's already a certificate for this path
+          await checkForCertificate(pathData.id);
         } else {
           // Try to get existing learning path
           const existingPath = await learningApi.getPath();
           if (existingPath) {
             setLearningPath(existingPath);
             await fetchStepStatuses(existingPath);
+            // Check if there's already a certificate for this path
+            await checkForCertificate(existingPath.id);
           }
         }
       } catch (err) {
@@ -111,6 +122,21 @@ export default function Learning() {
 
     fetchLearningPath();
   }, []);
+
+  const checkForCertificate = async (pathId: number) => {
+    try {
+      const result = await certificateApi.getCertificateForPath(pathId);
+      if (result.exists && result.certificate) {
+        setCertificate(result.certificate);
+        // Show certificate if path is completed
+        if (learningPath?.progress === 100) {
+          setShowCertificate(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for certificate:', error);
+    }
+  };
 
   const fetchStepStatuses = async (path: LearningPath) => {
     if (!path?.steps) return;
@@ -191,7 +217,14 @@ export default function Learning() {
     if (!learningPath) return;
     
     try {
-      await learningApi.markStepComplete(learningPath.id, stepId);
+      const result = await learningApi.markStepComplete(learningPath.id, stepId);
+      
+      // Check if certificate was generated
+      if (result.certificate) {
+        setCertificate(result.certificate);
+        setShowCertificate(true);
+      }
+      
       // Refresh learning path and statuses
       const updatedPath = await learningApi.getPath();
       if (updatedPath) {
@@ -311,7 +344,7 @@ export default function Learning() {
       {/* Debug Info */}
       {process.env.NODE_ENV === 'development' && (
         <div className="p-3 bg-muted/50 rounded-lg text-xs font-mono">
-          <p>Debug: steps={steps.length}, completed={completedSteps}, pathId={learningPath.id}</p>
+          <p>Debug: steps={steps.length}, completed={completedSteps}, pathId={learningPath.id}, certificate={!!certificate}</p>
         </div>
       )}
 
@@ -542,6 +575,30 @@ export default function Learning() {
                   : "Complete all steps and assessments to qualify for this position"
                 }
               </p>
+              {learningPath.progress === 100 && (
+                <Button 
+                  onClick={async () => {
+                    // Check if certificate exists, if not generate one
+                    if (!certificate) {
+                      try {
+                        const result = await certificateApi.generateCertificate(learningPath.id);
+                        if (result.certificate) {
+                          setCertificate(result.certificate);
+                          setShowCertificate(true);
+                        }
+                      } catch (error) {
+                        console.error('Error generating certificate:', error);
+                      }
+                    } else {
+                      setShowCertificate(true);
+                    }
+                  }}
+                  className="mt-4 bg-yellow-500 hover:bg-yellow-600 text-white gap-2"
+                >
+                  <Award className="w-4 h-4" />
+                  View Certificate
+                </Button>
+              )}
             </div>
           </Card>
         </div>
@@ -560,6 +617,14 @@ export default function Learning() {
           questions={currentAssessment.questions}
           onSubmit={handleAssessmentSubmit}
           onPass={handleAssessmentPass}
+        />
+      )}
+
+      {/* Certificate Modal */}
+      {showCertificate && certificate && (
+        <CertificateDisplay 
+          certificate={certificate} 
+          onClose={() => setShowCertificate(false)} 
         />
       )}
     </div>

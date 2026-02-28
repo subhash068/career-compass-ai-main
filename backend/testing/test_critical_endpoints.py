@@ -9,7 +9,7 @@ import os
 from unittest.mock import Mock, patch
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def test_career_recommendations_endpoint():
     """Test career recommendations endpoint returns correct AI DEPTH format"""

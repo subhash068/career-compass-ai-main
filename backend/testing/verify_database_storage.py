@@ -3,7 +3,7 @@ Test script to verify that user exam scores are being stored correctly in the da
 """
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.database import get_db
 from models.user_skill import UserSkill

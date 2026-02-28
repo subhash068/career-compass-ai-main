@@ -14,7 +14,10 @@ from models.skill_assessment import SkillAssessmentSkill, SkillAssessment
 from models.job_role import JobRole
 from models.role_skill_requirement import RoleSkillRequirement
 from models.skill import Skill
+from models.certificate import Certificate
+from models.user import User
 from ai.learning_optimizer import LearningOptimizer
+
 
 
 
@@ -430,6 +433,13 @@ class LearningService:
             assoc.assessment_passed = passed
         except AttributeError:
             pass  # Column doesn't exist, continue without saving
+
+        # If assessment passed, update user's skill score
+        if passed:
+            LearningService._update_user_skill_after_assessment(
+                db, user_id, step.skill_id, step.target_level, score
+            )
+
         db.commit()
 
         return {
@@ -790,7 +800,8 @@ class LearningService:
         step_id: int
     ) -> Dict[str, Any]:
         """
-        Mark a learning step as completed
+        Mark a learning step as completed.
+        If all steps are completed, a certificate will be generated automatically.
         """
         path = db.query(LearningPath).filter_by(
             id=path_id,
@@ -820,13 +831,75 @@ class LearningService:
             is_completed=True
         ).count()
 
+        old_progress = path.progress
         path.progress = int((done / total) * 100) if total else 0
         path.updated_at = datetime.utcnow()
 
         db.commit()
         db.refresh(path)
 
-        return path.to_dict()
+        # Check if learning path is now complete (100%) and generate certificate
+        certificate = None
+        if path.progress == 100 and old_progress < 100:
+            certificate = LearningService._generate_certificate(db, path, user_id)
+
+        result = path.to_dict()
+        
+        # Include certificate in response if generated
+        if certificate:
+            result["certificate"] = certificate.to_dict()
+            result["certificate_generated"] = True
+
+        return result
+
+    # --------------------------------------------------
+    # GENERATE CERTIFICATE
+    # --------------------------------------------------
+    @staticmethod
+    def _generate_certificate(
+        db: Session,
+        path: LearningPath,
+        user_id: int
+    ) -> Certificate:
+        """
+        Generate a certificate for completing a learning path.
+        This is called automatically when all modules are completed.
+        """
+        # Check if certificate already exists
+        existing_cert = db.query(Certificate).filter(
+            Certificate.learning_path_id == path.id,
+            Certificate.user_id == user_id
+        ).first()
+        
+        if existing_cert:
+            return existing_cert
+        
+        # Get user
+        user = db.query(User).filter_by(id=user_id).first()
+        if not user:
+            raise ValueError("User not found")
+        
+        # Get the role title
+        role_title = "Unknown Role"
+        if path.target_role:
+            role_title = path.target_role.title or path.target_role.name or role_title
+        
+        # Create the certificate
+        certificate = Certificate(
+            user_id=user_id,
+            learning_path_id=path.id,
+            role_title=role_title,
+            user_name=user.name,
+            issued_at=datetime.utcnow(),
+        )
+        
+        db.add(certificate)
+        db.commit()
+        db.refresh(certificate)
+        
+        print(f"[CERTIFICATE] Generated certificate {certificate.id} for user {user_id} for role {role_title}")
+        
+        return certificate
 
     # --------------------------------------------------
     # BUILD DEPENDENCY GRAPH
@@ -847,6 +920,61 @@ class LearningService:
         return graph
 
     # --------------------------------------------------
+    # UPDATE USER SKILL AFTER ASSESSMENT
+    # --------------------------------------------------
+    @staticmethod
+    def _update_user_skill_after_assessment(
+        db: Session,
+        user_id: int,
+        skill_id: int,
+        target_level: str,
+        score: float
+    ) -> None:
+        """
+        Update user skill after passing a learning step assessment.
+        """
+        # Map target level to score
+        level_to_score = {
+            "beginner": 25,
+            "intermediate": 50,
+            "advanced": 75,
+            "expert": 100
+        }
+        calibrated_score = level_to_score.get(target_level, 50)
+
+        # Update or create UserSkill
+        user_skill = db.query(UserSkill).filter_by(
+            user_id=user_id, skill_id=skill_id
+        ).first()
+
+        if user_skill:
+            user_skill.score = calibrated_score
+            user_skill.confidence = int(score)
+            user_skill.assessed_at = datetime.utcnow()
+        else:
+            user_skill = UserSkill(
+                user_id=user_id,
+                skill_id=skill_id,
+                score=calibrated_score,
+                confidence=int(score)
+            )
+            db.add(user_skill)
+
+        # Create assessment record for history tracking
+        assessment = SkillAssessment(user_id=user_id)
+        db.add(assessment)
+        db.flush()
+
+        assessment_skill = SkillAssessmentSkill(
+            assessment_id=assessment.id,
+            skill_id=skill_id,
+            level=target_level,
+            confidence=int(score),
+            score=calibrated_score
+        )
+        db.add(assessment_skill)
+
+    # --------------------------------------------------
     # LEVEL → SCORE
     # --------------------------------------------------
     @staticmethod
@@ -857,3 +985,69 @@ class LearningService:
             "advanced": 75,
             "expert": 100,
         }.get(level, 25)
+
+    # --------------------------------------------------
+    # RECALCULATE PATH DURATION
+    # --------------------------------------------------
+    @staticmethod
+    def recalculate_path_duration(db: Session, path_id: int) -> str:
+        """
+        Recalculate the total duration of a learning path based on its steps.
+        Returns the new total duration string (e.g., "17 weeks").
+        """
+        print(f"[DEBUG] Recalculating duration for path {path_id}")
+        
+        # Get all step associations for this path with eager-loaded steps
+        from sqlalchemy.orm import joinedload
+        associations = db.query(LearningPathStepAssociation).options(
+            joinedload(LearningPathStepAssociation.step)
+        ).filter_by(
+            learning_path_id=path_id
+        ).all()
+        
+        print(f"[DEBUG] Found {len(associations)} associations")
+        
+        total_weeks = 0
+        
+        for assoc in associations:
+            step = assoc.step
+            if step and step.estimated_duration:
+                # Parse duration string like "6 weeks", "2 hours", "3 days"
+                duration_str = step.estimated_duration.lower().strip()
+                print(f"[DEBUG] Processing step {step.id}: '{duration_str}'")
+                
+                # Try to extract number and unit (handle both singular and plural)
+                import re
+                match = re.search(r'(\d+)\s*(weeks?|days?|hours?|months?)', duration_str)
+                if match:
+                    number = int(match.group(1))
+                    unit = match.group(2).lower()
+                    print(f"[DEBUG] Matched: number={number}, unit={unit}")
+                    
+                    # Convert to weeks (approximate)
+                    if 'week' in unit:
+                        total_weeks += number
+                    elif 'day' in unit:
+                        total_weeks += max(1, number // 7)  # At least 1 week
+                    elif 'hour' in unit:
+                        total_weeks += max(1, number // 40)  # Assume 40 hours/week
+                    elif 'month' in unit:
+                        total_weeks += number * 4  # Assume 4 weeks/month
+                else:
+                    print(f"[DEBUG] No match for duration: '{duration_str}'")
+            else:
+                print(f"[DEBUG] Association {assoc.id} has no step or duration")
+        
+        print(f"[DEBUG] Total weeks calculated: {total_weeks}")
+        
+        # Update the path
+        path = db.query(LearningPath).filter_by(id=path_id).first()
+        if path:
+            path.total_duration = f"{total_weeks} weeks" if total_weeks > 0 else "0 weeks"
+            path.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(path)
+            print(f"[DEBUG] Updated path {path_id} duration to: {path.total_duration}")
+            return path.total_duration
+        
+        return f"{total_weeks} weeks"

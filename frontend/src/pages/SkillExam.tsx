@@ -1,14 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ChevronLeft, CheckCircle2, Loader2, Timer } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, Loader2, Timer, Maximize, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { skillsApi } from '@/api/skills.api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/auth/AuthContext';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
 
 
 interface Question {
@@ -49,8 +57,19 @@ export default function SkillExam() {
   const [skillId, setSkillId] = useState<number | null>(initialSkillId);
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
   const [nextSkill, setNextSkill] = useState<{id: number, name: string} | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showSecurityWarning, setShowSecurityWarning] = useState(false);
+  const [securityViolations, setSecurityViolations] = useState(0);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const examContainerRef = useRef<HTMLDivElement>(null);
+  const violationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Security constants
+  const MAX_VIOLATIONS = 3;
+  const VIOLATION_WARNING_DURATION = 5000; // 5 seconds
 
   // Reset state when URL parameter changes (for next exam navigation)
+
   useEffect(() => {
     setSkillId(initialSkillId);
     setExamComplete(false);
@@ -79,6 +98,222 @@ export default function SkillExam() {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Enter fullscreen mode
+  const enterFullscreen = useCallback(async () => {
+    try {
+      const element = examContainerRef.current || document.documentElement;
+      if (element.requestFullscreen) {
+        await element.requestFullscreen();
+      } else if ((element as any).webkitRequestFullscreen) {
+        await (element as any).webkitRequestFullscreen();
+      } else if ((element as any).msRequestFullscreen) {
+        await (element as any).msRequestFullscreen();
+      }
+      setIsFullscreen(true);
+    } catch (err) {
+      console.error('Failed to enter fullscreen:', err);
+      toast({
+        title: "Fullscreen Required",
+        description: "Please allow fullscreen mode to start the exam.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  // Exit fullscreen mode
+  const exitFullscreen = useCallback(() => {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if ((document as any).webkitExitFullscreen) {
+      (document as any).webkitExitFullscreen();
+    } else if ((document as any).msExitFullscreen) {
+      (document as any).msExitFullscreen();
+    }
+    setIsFullscreen(false);
+  }, []);
+
+  // Handle security violation
+  const handleSecurityViolation = useCallback((reason: string) => {
+    if (examComplete) return; // Don't count violations after exam is complete
+    
+    const newViolations = securityViolations + 1;
+    setSecurityViolations(newViolations);
+    setShowSecurityWarning(true);
+    
+    // Clear any existing timeout
+    if (violationTimeoutRef.current) {
+      clearTimeout(violationTimeoutRef.current);
+    }
+    
+    // Auto-hide warning after duration
+    violationTimeoutRef.current = setTimeout(() => {
+      setShowSecurityWarning(false);
+    }, VIOLATION_WARNING_DURATION);
+    
+    toast({
+      title: "Security Warning!",
+      description: `Violation ${newViolations}/${MAX_VIOLATIONS}: ${reason}. ${newViolations >= MAX_VIOLATIONS ? 'Exam will be auto-submitted!' : 'Please follow exam rules.'}`,
+      variant: "destructive",
+    });
+    
+    // Auto-submit if max violations reached
+    if (newViolations >= MAX_VIOLATIONS) {
+      toast({
+        title: "Maximum Violations Reached",
+        description: "Auto-submitting exam due to security violations...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        submitExam();
+      }, 2000);
+    }
+  }, [securityViolations, examComplete, toast]);
+
+  // Prevent keyboard shortcuts
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (examComplete) return;
+    
+    // Prevent Tab switching
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      handleSecurityViolation('Tab key is disabled during exam');
+      return;
+    }
+    
+    // Prevent Alt+Tab (Alt key)
+    if (e.altKey) {
+      e.preventDefault();
+      handleSecurityViolation('Alt key combinations are disabled');
+      return;
+    }
+    
+    // Prevent Ctrl/Cmd combinations (copy, paste, print, etc.)
+    if (e.ctrlKey || e.metaKey) {
+      const blockedKeys = ['c', 'v', 'x', 'p', 'a', 'f', 's', 't', 'w', 'n', 'r'];
+      if (blockedKeys.includes(e.key.toLowerCase())) {
+        e.preventDefault();
+        handleSecurityViolation(`Ctrl+${e.key.toUpperCase()} is disabled during exam`);
+        return;
+      }
+    }
+    
+    // Prevent F-keys (F1-F12)
+    if (e.key.startsWith('F') && e.key.length > 1) {
+      e.preventDefault();
+      handleSecurityViolation('Function keys are disabled during exam');
+      return;
+    }
+    
+    // Prevent Escape key (could exit fullscreen)
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      handleSecurityViolation('Escape key is disabled during exam');
+      return;
+    }
+  }, [examComplete, handleSecurityViolation]);
+
+  // Prevent context menu (right-click)
+  const handleContextMenu = useCallback((e: MouseEvent) => {
+    e.preventDefault();
+    handleSecurityViolation('Right-click is disabled during exam');
+  }, [handleSecurityViolation]);
+
+  // Prevent copy/paste/cut via events
+  const handleCopyPaste = useCallback((e: ClipboardEvent) => {
+    e.preventDefault();
+    handleSecurityViolation('Copy/Paste is disabled during exam');
+  }, [handleSecurityViolation]);
+
+  // Handle visibility change (tab switching, minimizing)
+  const handleVisibilityChange = useCallback(() => {
+    if (document.hidden && !examComplete) {
+      handleSecurityViolation('Window switching is not allowed during exam');
+    }
+  }, [examComplete, handleSecurityViolation]);
+
+  // Handle window blur (losing focus)
+  const handleWindowBlur = useCallback(() => {
+    if (!examComplete) {
+      handleSecurityViolation('Window focus loss detected');
+    }
+  }, [examComplete, handleSecurityViolation]);
+
+  // Handle fullscreen change
+  const handleFullscreenChange = useCallback(() => {
+    const isCurrentlyFullscreen = !!document.fullscreenElement;
+    setIsFullscreen(isCurrentlyFullscreen);
+    
+    if (!isCurrentlyFullscreen && !examComplete && !showExitConfirm) {
+      handleSecurityViolation('Fullscreen mode is required during exam');
+      // Try to re-enter fullscreen
+      setTimeout(() => {
+        enterFullscreen();
+      }, 100);
+    }
+  }, [examComplete, showExitConfirm, handleSecurityViolation, enterFullscreen]);
+
+  // Setup security measures
+  useEffect(() => {
+    if (loading || isAuthLoading || examComplete) return;
+    
+    // Enter fullscreen when exam loads
+    enterFullscreen();
+    
+    // Add event listeners
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('copy', handleCopyPaste);
+    document.addEventListener('cut', handleCopyPaste);
+    document.addEventListener('paste', handleCopyPaste);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('msfullscreenchange', handleFullscreenChange);
+    
+    // Prevent drag and drop
+    const preventDragDrop = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener('dragstart', preventDragDrop);
+    document.addEventListener('drop', preventDragDrop);
+    
+    // Cleanup
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('copy', handleCopyPaste);
+      document.removeEventListener('cut', handleCopyPaste);
+      document.removeEventListener('paste', handleCopyPaste);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('dragstart', preventDragDrop);
+      document.removeEventListener('drop', preventDragDrop);
+      
+      if (violationTimeoutRef.current) {
+        clearTimeout(violationTimeoutRef.current);
+      }
+    };
+  }, [loading, isAuthLoading, examComplete, enterFullscreen, handleKeyDown, handleContextMenu, handleCopyPaste, handleVisibilityChange, handleWindowBlur, handleFullscreenChange]);
+
+  // Handle beforeunload (page refresh/close)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!examComplete) {
+        e.preventDefault();
+        e.returnValue = 'You are in the middle of an exam. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [examComplete]);
+
 
   useEffect(() => {
     const loadExam = async () => {
@@ -337,6 +572,35 @@ export default function SkillExam() {
     );
   }
 
+  // Security warning overlay
+  if (showSecurityWarning && !examComplete) {
+    return (
+      <div className="fixed inset-0 bg-red-900/90 z-50 flex items-center justify-center">
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-lg max-w-md text-center animate-pulse">
+          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Security Violation!</h2>
+          <p className="text-lg mb-4">
+            Violation {securityViolations} of {MAX_VIOLATIONS}
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Please follow exam rules. {securityViolations >= MAX_VIOLATIONS ? 'Exam will be auto-submitted!' : 'Continue the exam in fullscreen mode.'}
+          </p>
+          <Button 
+            onClick={() => {
+              setShowSecurityWarning(false);
+              enterFullscreen();
+            }}
+            className="w-full"
+          >
+            <Maximize className="w-4 h-4 mr-2" />
+            Return to Exam
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+
 
   if (examComplete && results) {
     return (
@@ -404,7 +668,40 @@ export default function SkillExam() {
   const currentQ = questions[currentQuestion];
 
   return (
-    <div className="space-y-2 animate-fade-in max-w-xl mx-auto">
+    <div 
+      ref={examContainerRef}
+      className="space-y-2 animate-fade-in max-w-xl mx-auto min-h-screen bg-background p-4"
+    >
+      {/* Fullscreen Toggle Button */}
+      {!isFullscreen && !examComplete && (
+        <div className="fixed top-4 right-4 z-40">
+          <Button
+            onClick={enterFullscreen}
+            variant="outline"
+            size="sm"
+            className="bg-yellow-100 border-yellow-300 text-yellow-800 hover:bg-yellow-200"
+          >
+            <Maximize className="w-4 h-4 mr-2" />
+            Enter Fullscreen
+          </Button>
+        </div>
+      )}
+
+      {/* Security Status Indicator */}
+      <div className="fixed top-4 left-4 z-40 flex items-center gap-2">
+        <div className={cn(
+          "px-3 py-1 rounded-full text-xs font-medium",
+          isFullscreen ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+        )}>
+          {isFullscreen ? '🔒 Secure Mode' : '⚠️ Not Secure'}
+        </div>
+        {securityViolations > 0 && (
+          <div className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+            Violations: {securityViolations}/{MAX_VIOLATIONS}
+          </div>
+        )}
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => navigate('/skill_selection')}>
@@ -434,7 +731,7 @@ export default function SkillExam() {
       </div>
 
       {/* Question Card */}
-      <Card>
+      <Card className="select-none">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl">
@@ -451,7 +748,7 @@ export default function SkillExam() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <h3 className="text-lg font-medium">
+          <h3 className="text-lg font-medium select-none">
             {currentQ?.question_text}
           </h3>
 
@@ -460,11 +757,12 @@ export default function SkillExam() {
               <label
                 key={index}
                 className={cn(
-                  "flex items-center space-x-3 p-5 rounded-lg border cursor-pointer transition-colors",
+                  "flex items-center space-x-3 p-5 rounded-lg border cursor-pointer transition-colors select-none",
                   answers[currentQ.id] === option
                     ? "border-primary bg-primary/5"
                     : "border-border hover:border-primary/50"
                 )}
+                onContextMenu={(e) => e.preventDefault()}
               >
                 <input
                   type="radio"
@@ -473,13 +771,17 @@ export default function SkillExam() {
                   checked={answers[currentQ.id] === option}
                   onChange={() => handleAnswer(currentQ.id, option)}
                   className="text-primary w-4 h-4"
+                  onCopy={(e) => e.preventDefault()}
+                  onCut={(e) => e.preventDefault()}
+                  onPaste={(e) => e.preventDefault()}
                 />
-                <span>{option}</span>
+                <span className="select-none">{option}</span>
               </label>
             ))}
           </div>
         </CardContent>
       </Card>
+
 
       {/* Written Assessment (shown after last question) */}
       {currentQuestion === questions.length - 1 && (
@@ -497,7 +799,20 @@ export default function SkillExam() {
               value={writtenAnswer}
               onChange={(e) => setWrittenAnswer(e.target.value)}
               placeholder={`Write about your experience with ${skillName}...`}
-              className="w-full min-h-[120px] p-3 rounded-lg border border-border bg-background resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full min-h-[120px] p-3 rounded-lg border border-border bg-background resize-y focus:outline-none focus:ring-2 focus:ring-primary/50 select-none"
+              onCopy={(e) => {
+                e.preventDefault();
+                handleSecurityViolation('Copy is disabled during exam');
+              }}
+              onCut={(e) => {
+                e.preventDefault();
+                handleSecurityViolation('Cut is disabled during exam');
+              }}
+              onPaste={(e) => {
+                e.preventDefault();
+                handleSecurityViolation('Paste is disabled during exam');
+              }}
+              onContextMenu={(e) => e.preventDefault()}
             />
             <div className="mt-2 text-xs text-muted-foreground text-right">
               {writtenAnswer.length} characters
@@ -505,6 +820,7 @@ export default function SkillExam() {
           </CardContent>
         </Card>
       )}
+
 
       {/* Navigation */}
       <div className="flex justify-between">

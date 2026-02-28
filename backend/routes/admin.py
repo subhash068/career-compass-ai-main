@@ -398,18 +398,34 @@ def get_learning_path_steps(
         if not path:
             raise HTTPException(status_code=404, detail="Learning path not found")
         
-        steps = db.query(LearningPathStep).filter(
-            LearningPathStep.learning_paths.any(id=path_id)
+        # Get steps through the association table
+        from models.learning_path import LearningPathStepAssociation
+        associations = db.query(LearningPathStepAssociation).filter(
+            LearningPathStepAssociation.learning_path_id == path_id
         ).all()
         
+        # Get step details for each association
+        steps = []
+        for assoc in associations:
+            step = db.query(LearningPathStep).filter(LearningPathStep.id == assoc.step_id).first()
+            if step:
+                step_dict = step.to_dict()
+                step_dict["order"] = assoc.order
+                step_dict["is_completed"] = assoc.is_completed
+                step_dict["isCompleted"] = assoc.is_completed
+                step_dict["assessment_passed"] = assoc.assessment_passed
+                step_dict["assessmentPassed"] = assoc.assessment_passed
+                steps.append(step_dict)
+        
         return {
-            "steps": [s.to_dict() for s in steps],
+            "steps": steps,
             "count": len(steps)
         }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.put("/learning-paths/{path_id}/steps/{step_id}")
@@ -447,14 +463,191 @@ def update_learning_step(
         db.commit()
         db.refresh(step)
         
+        # Recalculate total duration
+        LearningService.recalculate_path_duration(db, path_id)
+        
         return {
             "message": "Learning step updated successfully",
             "step": step.to_dict()
         }
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/learning-paths/{path_id}/steps/{step_id}")
+def delete_learning_step(
+    path_id: int,
+    step_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Delete a learning path step (admin only)
+    """
+    try:
+        # Check if learning path exists
+        path = db.query(LearningPath).filter(LearningPath.id == path_id).first()
+        if not path:
+            raise HTTPException(status_code=404, detail="Learning path not found")
+        
+        # Find the step
+        step = db.query(LearningPathStep).filter(LearningPathStep.id == step_id).first()
+        if not step:
+            raise HTTPException(status_code=404, detail="Learning step not found")
+        
+        # Remove association first
+        from models.learning_path import LearningPathStepAssociation
+        association = db.query(LearningPathStepAssociation).filter(
+            LearningPathStepAssociation.learning_path_id == path_id,
+            LearningPathStepAssociation.step_id == step_id
+        ).first()
+        
+        if association:
+            db.delete(association)
+            db.commit()
+        
+        # Delete the step
+        db.delete(step)
+        db.commit()
+        
+        # Recalculate total duration
+        LearningService.recalculate_path_duration(db, path_id)
+        
+        return {"message": "Learning step deleted successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.post("/learning-paths/{path_id}/steps")
+def create_learning_step(
+    path_id: int,
+    step_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Create a new learning path step (admin only)
+    """
+    try:
+        import traceback
+        print(f"[DEBUG] Creating step for path {path_id}")
+        print(f"[DEBUG] Step data: {step_data}")
+        
+        # Check if learning path exists
+        path = db.query(LearningPath).filter(LearningPath.id == path_id).first()
+        if not path:
+            raise HTTPException(status_code=404, detail="Learning path not found")
+        
+        # Validate required fields
+        if not step_data.get("skill_name"):
+            raise HTTPException(status_code=400, detail="skill_name is required")
+        
+        # Find or create skill by name
+        skill = db.query(Skill).filter(Skill.name == step_data.get("skill_name")).first()
+        if not skill:
+            # Find or create a default domain for new skills
+            from models.domain import Domain
+            default_domain = db.query(Domain).first()
+            if not default_domain:
+                # Create a default domain if none exists
+                default_domain = Domain(
+                    name="General",
+                    description="General skills domain"
+                )
+                db.add(default_domain)
+                db.commit()
+                db.refresh(default_domain)
+                print(f"[DEBUG] Created default domain with ID: {default_domain.id}")
+            
+            # Create new skill if it doesn't exist
+            skill = Skill(
+                name=step_data.get("skill_name"),
+                description=f"Skill for {step_data.get('skill_name')}",
+                domain_id=default_domain.id,
+                depends_on='[]'
+            )
+
+            db.add(skill)
+            db.commit()
+            db.refresh(skill)
+            print(f"[DEBUG] Created new skill with ID: {skill.id}, domain_id: {skill.domain_id}")
+
+        
+        # Get the next order number
+        from models.learning_path import LearningPathStepAssociation
+        max_order = db.query(LearningPathStepAssociation).filter(
+            LearningPathStepAssociation.learning_path_id == path_id
+        ).count()
+        print(f"[DEBUG] Max order for path {path_id}: {max_order}")
+        
+        # Create new step
+        new_step = LearningPathStep(
+            skill_id=skill.id,
+            target_level=step_data.get("target_level", "beginner"),
+            order=max_order + 1,
+            estimated_duration=step_data.get("estimated_duration", ""),
+            is_completed=step_data.get("is_completed", False),
+        )
+        
+        # Set resources if provided
+        if "resources" in step_data:
+            new_step.set_resources(step_data["resources"])
+            print(f"[DEBUG] Set resources: {step_data['resources']}")
+        else:
+            new_step.set_resources([])
+        
+        # Set dependencies if provided
+        if "dependencies" in step_data:
+            new_step.set_dependencies(step_data["dependencies"])
+        else:
+            new_step.set_dependencies([])
+        
+        # Set assessment questions if provided
+        if "assessment_questions" in step_data:
+            new_step.set_assessment_questions(step_data["assessment_questions"])
+            print(f"[DEBUG] Set assessment_questions: {step_data['assessment_questions']}")
+        else:
+            new_step.set_assessment_questions([])
+        
+        db.add(new_step)
+        db.commit()
+        db.refresh(new_step)
+        print(f"[DEBUG] Created new step with ID: {new_step.id}")
+        
+        # Associate step with learning path
+        association = LearningPathStepAssociation(
+            learning_path_id=path_id,
+            step_id=new_step.id,
+            order=max_order + 1
+        )
+        db.add(association)
+        db.commit()
+        print(f"[DEBUG] Created association for step {new_step.id} in path {path_id}")
+        
+        # Recalculate total duration
+        LearningService.recalculate_path_duration(db, path_id)
+        
+        return {
+            "message": "Learning step created successfully",
+            "step": new_step.to_dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Error creating learning step: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
 
 
 # --------------------------------------------------
